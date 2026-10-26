@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#070b18"><title>Ember</title>
+<style>
+:root{--h:28}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#070b18;color:#eef2ff;font-family:Roboto,"Segoe UI",system-ui,sans-serif;overflow:hidden}
+#bg{position:fixed;inset:0;z-index:0;overflow:hidden}
+#bg i{position:absolute;width:70vmax;height:70vmax;border-radius:50%;filter:blur(80px);opacity:.35}
+#bg i:nth-child(1){background:hsl(var(--h) 90% 45%);left:-30vmax;top:-30vmax;animation:dr 18s ease-in-out infinite alternate}
+#bg i:nth-child(2){background:hsl(calc(var(--h) + 90) 80% 40%);right:-35vmax;bottom:-25vmax;animation:dr 24s ease-in-out infinite alternate-reverse}
+@keyframes dr{to{transform:translate(12vmax,10vmax) scale(1.15)}}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:1}
+#cf{position:fixed;inset:0;pointer-events:none;z-index:60}
+#app{position:fixed;inset:0;z-index:2;overflow-y:auto;padding:calc(env(safe-area-inset-top) + 14px) 18px 170px}
+.tab{display:none;max-width:480px;margin:0 auto}
+.tab.on{display:block;animation:in .5s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:0;transform:translateY(18px)}}
+.top{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
+h2.t{font-size:22px;font-weight:800;margin:6px 0 14px}
+.chip{font-size:13px;color:#cfd7f7;background:rgba(255,255,255,.08);padding:7px 13px;border-radius:999px}
+.orb{position:relative;width:min(76vw,300px);aspect-ratio:1;margin:18px auto 6px}
+.orb::before{content:"";position:absolute;inset:8%;border-radius:50%;background:radial-gradient(circle,hsl(var(--h) 100% 50%/.3),transparent 70%);animation:gl 4s ease-in-out infinite}
+@keyframes gl{50%{transform:scale(1.2);opacity:.65}}
+.orb svg{position:absolute;inset:0;width:100%;height:100%}
+.spin{transform-origin:130px 130px;animation:sp 40s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-shadow:0 2px 14px #000b}
+.lv{font-size:16px;font-weight:700;background:linear-gradient(90deg,hsl(var(--h) 100% 68%),#fff,hsl(var(--h) 100% 68%));background-size:200%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sh 3s linear infinite;text-shadow:none}
+@keyframes sh{to{background-position:-200%}}
+.days{font-weight:800;font-size:clamp(64px,22vw,84px);line-height:1.05;letter-spacing:-.03em}
+.days.pop{animation:pop .5s}
+@keyframes pop{40%{transform:scale(1.12)}}
+.dl{font-size:13px;color:#b9c3e6}
+.hms{margin-top:6px;font-size:18px;font-variant-numeric:tabular-nums;color:#e6ebff}
+#next{text-align:center;color:#a9b4da;font-size:14px}
+.card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:16px;backdrop-filter:blur(10px);margin-top:14px}
+.card h3{font-size:13px;color:#9aa6cf;font-weight:600;margin-bottom:6px}
+.card p{font-size:16px;line-height:1.5}
+button{font:inherit;cursor:pointer;border:0;color:inherit;transition:transform .15s}
+button:active{transform:scale(.95)}
+.sm{margin-top:12px;padding:11px 18px;border-radius:12px;background:hsl(var(--h) 75% 40%);color:#fff;font-weight:700}
+.sm:disabled{background:rgba(255,255,255,.08);color:#8e9ac0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .card{margin:0;text-align:center}
+.grid b{display:block;font-size:30px;font-weight:800;color:hsl(var(--h) 100% 72%)}
+.grid span{font-size:13px;color:#9aa6cf}
+.map{padding-left:2px}
+.node{display:flex;gap:14px;position:relative;padding-bottom:24px}
+.node::before{content:"";position:absolute;left:17px;top:38px;bottom:-2px;width:2px;background:rgba(255,255,255,.1)}
+.node:last-child::before{display:none}
+.dot{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#141a30;border:2px solid #2a3252;font-size:13px;font-weight:700;color:#6f7aa3;z-index:1}
+.node.done .dot{background:var(--c);border-color:var(--c);color:#fff;box-shadow:0 0 16px var(--c)}
+.node.cur .dot{background:var(--c);border-color:#fff;color:#fff;animation:pl 1.8s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 var(--c)}70%{box-shadow:0 0 0 14px transparent}}
+.node h3{font-size:17px}.node p{font-size:13px;color:#8e9ac0;margin-top:2px}
+.node.lock{opacity:.5}
+.hl{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:15px}
+.hl:last-child{border:0}
+.ghost{background:none;color:#8591b8;font-size:14px;padding:12px;text-decoration:underline;width:100%}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;justify-content:space-around;padding:10px 20px calc(env(safe-area-inset-bottom) + 10px);background:rgba(7,11,24,.88);backdrop-filter:blur(14px);border-top:1px solid rgba(255,255,255,.07)}
+nav button{background:none;color:#6f7aa3;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;width:80px}
+nav button.on{color:hsl(var(--h) 100% 72%)}
+nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fab{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 82px);padding:15px 38px;border-radius:999px;font-weight:800;font-size:17px;color:#fff;background:linear-gradient(135deg,#ff2d55,#ff8a3d);animation:pulse 2s infinite}
+.fab:active{transform:translateX(-50%) scale(.95)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,45,85,.6)}70%{box-shadow:0 0 0 22px rgba(255,45,85,0)}100%{box-shadow:0 0 0 0 rgba(255,45,85,0)}}
+.ov{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:linear-gradient(160deg,#1c0b24,#09122e);padding:24px;text-align:center;overflow-y:auto}
+.ov.on{display:flex;animation:in .4s}
+.ov>div{max-width:420px;width:100%}
+.ov h2{font-size:28px;font-weight:800;margin-bottom:6px}
+.bw{position:relative;width:140px;height:140px;margin:64px auto}
+.br{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,#8ff3ff,#3a6bff 70%);box-shadow:0 0 60px #3a6bff99;animation:br 14s ease-in-out infinite}
+@keyframes br{0%{transform:scale(1)}28.57%{transform:scale(1.6)}57.14%{transform:scale(1.6)}100%{transform:scale(1)}}
+.rp{position:absolute;inset:0;border-radius:50%;border:2px solid #7df0ff;opacity:0;animation:rp 4.67s ease-out infinite}
+.rp:nth-child(2){animation-delay:1.55s}.rp:nth-child(3){animation-delay:3.1s}
+@keyframes rp{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+#bt{font-size:24px;font-weight:700;color:#8ff3ff;height:32px}
+#cd{font-size:44px;font-weight:800;margin:8px 0}
+#pt{font-size:18px;font-weight:700;margin:12px 0}
+#pq{color:#b9c3e6;line-height:1.5;margin-bottom:8px}
+.big{width:100%;padding:15px;border-radius:14px;background:linear-gradient(135deg,#27d98a,#18a9c9);color:#04121a;font-weight:800;font-size:17px;margin-top:10px}
+.big:disabled{background:rgba(255,255,255,.08);color:#8e9ac0}
+.big.red{background:#ff2d55;color:#fff}
+.ov.c{background:rgba(5,8,18,.9);z-index:30}
+input{font:inherit;padding:12px;border-radius:12px;border:1px solid #334;background:#121a33;color:#fff;width:100%;margin:16px 0;color-scheme:dark}
+#lu{z-index:50;background:radial-gradient(circle,hsl(var(--h) 60% 18%),#05080f 70%)}
+.star{font-size:96px;color:hsl(var(--h) 100% 65%);text-shadow:0 0 40px hsl(var(--h) 100% 55%);animation:zm .9s cubic-bezier(.2,1.6,.4,1)}
+@keyframes zm{from{transform:scale(0) rotate(-200deg)}}
+#lun{font-size:44px;font-weight:800;animation:zm 1.1s .15s both cubic-bezier(.2,1.6,.4,1)}
+#toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translate(-50%,-80px);opacity:0;transition:.4s;z-index:70;background:#fff;color:#0a0f1e;padding:11px 20px;border-radius:999px;font-weight:700;pointer-events:none;white-space:nowrap}
+#toast.on{transform:translate(-50%,0);opacity:1}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style></head><body>
+<div id="bg"><i></i><i></i></div><canvas id="fx"></canvas><canvas id="cf"></canvas>
+<div id="app">
+<section class="tab on" id="t-home">
+<div class="top"><h1>Ember</h1><span class="chip" id="best">Best 0 days</span></div>
+<div class="orb" id="orb"><svg viewBox="0 0 260 260">
+<circle class="spin" cx="130" cy="130" r="126" fill="none" stroke="hsl(var(--h) 100% 70%)" stroke-opacity=".4" stroke-width="2" stroke-dasharray="2 11" stroke-linecap="round"/>
+<circle cx="130" cy="130" r="114" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="10"/>
+<circle id="ring" cx="130" cy="130" r="114" fill="none" stroke="hsl(var(--h) 100% 62%)" stroke-width="10" stroke-linecap="round" stroke-dasharray="716.3" stroke-dashoffset="716.3" transform="rotate(-90 130 130)" style="transition:stroke-dashoffset 1s linear;filter:drop-shadow(0 0 8px hsl(var(--h) 100% 55%))"/></svg>
+<div class="in"><div class="lv" id="lv">Spark</div><div class="days" id="d">0</div><div class="dl">days clean</div><div class="hms" id="hms">00:00:00</div></div></div>
+<div id="next"></div>
+<div class="card"><h3>Today's challenge</h3><p id="ch"></p><button class="sm" id="chb">Mark done</button></div>
+<div class="card"><h3>Remember this</h3><p id="qd"></p></div>
+</section>
+<section class="tab" id="t-lv"><h2 class="t">Your journey</h2><div class="map" id="map"></div></section>
+<section class="tab" id="t-st"><h2 class="t">Stats</h2>
+<div class="grid"><div class="card"><b id="s0">0</b><span>Total days clean</span></div><div class="card"><b id="s4">0</b><span>Best streak (days)</span></div>
+<div class="card"><b id="s1">0</b><span>Urges beaten</span></div><div class="card"><b id="s2">0</b><span>Challenges done</span></div></div>
+<div class="card"><h3>Past streaks</h3><div id="hist"></div></div>
+<button class="ghost" id="rb">I slipped. Reset streak</button>
+<button class="ghost" id="eb">Change start date</button>
+</section></div>
+<button class="fab" id="pb">Panic</button>
+<nav>
+<button class="on" data-t="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>Home</button>
+<button data-t="lv"><svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h12l-3 4 3 4H6"/></svg>Levels</button>
+<button data-t="st"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+</nav>
+
+<div class="ov" id="po"><div>
+<h2>Stop. Breathe.</h2><div id="ps" style="color:#aab4d8"></div>
+<div class="bw"><i class="rp"></i><i class="rp"></i><i class="rp"></i><div class="br" id="br"></div></div>
+<div id="bt">Inhale</div><div id="cd">60</div><div id="pt"></div><div id="pq"></div>
+<button class="big" id="won" disabled>I beat the urge</button><button class="ghost" id="pc">Close</button>
+</div></div>
+<div class="ov c" id="so"><div><h2>Start your streak</h2><p style="color:#b9c3e6">When did your clean streak begin? Leave it as is to start now.</p>
+<input type="datetime-local" id="sd"><button class="big" id="sg">Start</button><button class="ghost" id="sc">Cancel</button></div></div>
+<div class="ov c" id="md"><div><h2>Reset streak?</h2><p style="color:#b9c3e6;line-height:1.5">Your best streak stays saved. Be honest, then start again. One slip does not erase your progress.</p>
+<button class="big red" id="my">Yes, reset</button><button class="ghost" id="mn">Keep my streak</button></div></div>
+<div class="ov" id="lu"><div><div class="star">★</div><p style="color:#cfd7f7;font-size:18px;margin-top:8px">Level up</p><div id="lun"></div><p style="color:#9aa6cf;margin-top:18px">Tap to continue</p></div></div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const LV=[[0,'Spark',28,'The first spark'],[1,'Ember',22,'Day one is done'],[3,'Flame',14,'A habit is forming'],[7,'Torch',40,'One week strong'],[14,'Blaze',52,'Two weeks, urges are fading'],[30,'Warrior',150,'A full month'],[60,'Knight',180,'Two months of discipline'],[90,'Titan',205,'90 days, your mind has reset'],[180,'Legend',265,'Half a year'],[365,'Immortal',320,'One full year']];
+const QS=['Urges peak and pass. Ride it out.','Every day you hold on makes you stronger.','You are not the urge. You are the one watching it.','Ten minutes from now you will be glad you stayed strong.','Discipline is choosing what you want most over what you want now.','Your streak is proof you can do this.','Small wins every day become a new identity.','The version of you in 90 days is counting on you.'];
+const TS=['Stand up and do 20 push-ups right now.','Leave the room. Walk outside for 5 minutes.','Splash cold water on your face and drink a glass of water.','Text or call a friend. Do not sit alone with the urge.','Put your phone down and tidy one thing in your room.','Do 30 squats, then hold a 1 minute plank.'];
+const CH=['Do 30 push-ups today.','Take a cold shower.','Go for a 20 minute walk.','Read 10 pages of a book.','No phone in bed tonight.','Drink 3 litres of water.','Learn or practise a skill for 30 minutes.','Meditate for 10 minutes.','Clean your room.','Message a friend or family member.','Write down 3 goals for this week.','Stretch for 15 minutes.'];
+let S={};try{S=JSON.parse(localStorage.getItem('ember')||'{}')}catch(e){}
+const save=()=>{try{localStorage.setItem('ember',JSON.stringify(S))}catch(e){}};
+const lvlOf=d=>{let i=0;LV.forEach((l,k)=>{if(d>=l[0])i=k});return i};
+const pad=n=>String(n).padStart(2,'0'),rnd=a=>a[Math.floor(Math.random()*a.length)];
+const vib=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+const dayIdx=()=>Math.floor((Date.now()-new Date().getTimezoneOffset()*6e4)/864e5);
+let curI=0,H=28,shown=-1,lastD=-1;
+
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2600)}
+function go(t){document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.id==='t-'+t));
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));$('app').scrollTop=0}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+
+function buildMap(i){$('map').innerHTML=LV.map((l,k)=>`<div class="node ${k<i?'done':k===i?'cur':'lock'}" style="--c:hsl(${l[2]} 90% 52%)"><div class="dot">${k<i?'✓':k===i?'★':l[0]}</div><div><h3>${l[1]}</h3><p>${l[0]?l[0]+(l[0]>1?' days':' day'):'Start'}: ${l[3]}</p></div></div>`).join('')}
+function showLU(name){$('lun').textContent=name;$('lu').classList.add('on');vib([80,60,160]);burst(200);clearTimeout(showLU.t);showLU.t=setTimeout(()=>$('lu').classList.remove('on'),4500)}
+$('lu').onclick=()=>$('lu').classList.remove('on');
+
+function tick(){
+ if(!S.start){if(!$('so').classList.contains('on'))openSetup(false);return}
+ const ms=Math.max(0,Date.now()-S.start),days=ms/864e5,i=lvlOf(days);
+ if(S.lvl===undefined)S.lvl=i;
+ curI=i;H=LV[i][2];document.documentElement.style.setProperty('--h',H);
+ if(i>S.lvl){S.lvl=i;save();showLU(LV[i][1])}
+ const d=Math.floor(days),h=Math.floor(ms/36e5)%24,m=Math.floor(ms/6e4)%60,s=Math.floor(ms/1e3)%60;
+ $('d').textContent=d;if(d!==lastD){lastD=d;$('d').classList.remove('pop');void $('d').offsetWidth;$('d').classList.add('pop')}
+ $('hms').textContent=pad(h)+':'+pad(m)+':'+pad(s);$('lv').textContent=LV[i][1];
+ const nx=LV[i+1],p=nx?(days-LV[i][0])/(nx[0]-LV[i][0]):1,left=nx?Math.ceil(nx[0]-days):0;
+ $('ring').style.strokeDashoffset=716.3*(1-Math.min(1,p));
+ $('next').textContent=nx?`${left} day${left===1?'':'s'} to ${nx[1]}`:'Max level reached. You are Immortal.';
+ const best=Math.max(S.best||0,ms),hist=S.hist||[];
+ $('best').textContent='Best '+(best/864e5).toFixed(1)+' days';$('s4').textContent=(best/864e5).toFixed(1);
+ $('s0').textContent=((hist.reduce((a,b)=>a+b,0)+ms)/864e5).toFixed(1);
+ $('s1').textContent=S.urges||0;$('s2').textContent=S.chCount||0;
+ $('hist').innerHTML=hist.length?hist.slice(-6).reverse().map(x=>`<div class="hl"><span>Streak</span><b>${(x/864e5).toFixed(1)} days</b></div>`).join('')+`<div class="hl"><span>Resets</span><b>${S.resets||0}</b></div>`:'<p style="color:#8e9ac0;font-size:14px">No resets yet. Keep it that way.</p>';
+ if(shown!==i){buildMap(i);shown=i}
+ $('ch').textContent=CH[dayIdx()%CH.length];$('qd').textContent=QS[dayIdx()%QS.length];
+ const done=S.ch===dayIdx();$('chb').disabled=done;$('chb').textContent=done?'Done today':'Mark done';
+}
+$('chb').onclick=()=>{S.ch=dayIdx();S.chCount=(S.chCount||0)+1;save();burst(70);vib(60);toast('Challenge complete');tick()};
+
+function openSetup(c){$('sd').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);$('sc').style.display=c?'':'none';$('so').classList.add('on')}
+$('sg').onclick=()=>{let ts=$('sd').value?new Date($('sd').value).getTime():Date.now();if(!(ts<=Date.now()))ts=Date.now();
+ S.start=ts;S.lvl=lvlOf((Date.now()-ts)/864e5);save();shown=-1;$('so').classList.remove('on');tick()};
+$('sc').onclick=()=>$('so').classList.remove('on');
+$('eb').onclick=()=>openSetup(true);
+$('rb').onclick=()=>$('md').classList.add('on');
+$('mn').onclick=()=>$('md').classList.remove('on');
+$('my').onclick=()=>{const ms=Date.now()-S.start;S.hist=(S.hist||[]).concat(ms>6e4?[ms]:[]);S.best=Math.max(S.best||0,ms);S.resets=(S.resets||0)+1;
+ S.start=Date.now();S.lvl=0;save();shown=-1;$('md').classList.remove('on');go('home');tick();toast('New start. You are still in this.')};
+
+let pI,bI,pT=0,t0=0,ph='';
+function closePanic(){clearInterval(pI);clearInterval(bI);$('po').classList.remove('on')}
+$('pb').onclick=()=>{
+ if(!S.start)return;pT=60;t0=performance.now();ph='';$('cd').textContent=pT;$('won').disabled=true;
+ $('ps').textContent=`You are on a ${Math.floor((Date.now()-S.start)/864e5)} day streak. Do not throw it away.`;
+ $('pt').textContent=rnd(TS);$('pq').textContent=rnd(QS);vib(50);
+ const b=$('br');b.style.animation='none';void b.offsetWidth;b.style.animation='';
+ $('po').classList.add('on');
+ bI=setInterval(()=>{const x=((performance.now()-t0)/1e3)%14,p=x<4?'Inhale':x<8?'Hold':'Exhale';$('bt').textContent=p;if(p!==ph){ph=p;vib(30)}},200);
+ pI=setInterval(()=>{pT--;$('cd').textContent=Math.max(pT,0);if(pT===30)$('pq').textContent=rnd(QS);if(pT<=0){clearInterval(pI);$('won').disabled=false;vib([60,40,60])}},1000);
+};
+$('pc').onclick=closePanic;
+$('won').onclick=()=>{S.urges=(S.urges||0)+1;save();closePanic();burst(130);toast('Urge beaten. Total: '+S.urges);tick()};
+
+const fx=$('fx'),c=fx.getContext('2d'),cf=$('cf'),g2=cf.getContext('2d');let P=[],K=[],A=[];
+function rs(){fx.width=cf.width=innerWidth;fx.height=cf.height=innerHeight}
+addEventListener('resize',rs);rs();
+for(let i=0;i<34;i++)A.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,v:.2+Math.random()*.6,r:1+Math.random()*2.2,a:.15+Math.random()*.4,p:Math.random()*9});
+function burst(n){const cols=['#ffcf5c','#ff5c8a','#5ce1e6','#7d6bff','#5cff9d'];
+ for(let i=0;i<n;i++)K.push({x:innerWidth/2,y:innerHeight*.4,vx:(Math.random()-.5)*15,vy:-Math.random()*14-3,w:6+Math.random()*6,h:4+Math.random()*5,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:rnd(cols),l:1})}
+function loop(){
+ c.clearRect(0,0,fx.width,fx.height);g2.clearRect(0,0,cf.width,cf.height);c.globalCompositeOperation='lighter';
+ for(const a of A){a.y-=a.v;a.p+=.02;a.x+=Math.sin(a.p)*.3;if(a.y<-5){a.y=innerHeight+5;a.x=Math.random()*innerWidth}
+  c.fillStyle=`hsla(${H},100%,70%,${a.a})`;c.beginPath();c.arc(a.x,a.y,a.r,0,7);c.fill()}
+ const r=$('orb').getBoundingClientRect();
+ if(r.width>0&&r.bottom>0&&r.top<innerHeight){
+  const cx=r.left+r.width/2,cy=r.top+r.height/2,R=r.width/2,n=1+Math.floor(curI/2)+(Math.random()<.5?1:0);
+  for(let i=0;i<n&&P.length<420;i++)P.push({x:cx+(Math.random()-.5)*R*.8,y:cy+R*.55,vx:(Math.random()-.5)*.6,vy:-(.8+Math.random()*1.6),l:1,r:9+Math.random()*13+curI*1.4});
+  P=P.filter(p=>p.l>0);
+  for(const p of P){p.x+=p.vx+Math.sin(p.y*.05)*.3;p.y+=p.vy;p.l-=.013;
+   const rad=Math.max(1,p.r*p.l),g=c.createRadialGradient(p.x,p.y,0,p.x,p.y,rad);
+   g.addColorStop(0,`hsla(${H-(1-p.l)*20},100%,${55+p.l*20}%,${p.l*.4})`);g.addColorStop(1,`hsla(${H},100%,50%,0)`);
+   c.fillStyle=g;c.beginPath();c.arc(p.x,p.y,rad,0,7);c.fill()}
+ }
+ K=K.filter(k=>k.l>0&&k.y<innerHeight+20);
+ for(const k of K){k.vy+=.28;k.vx*=.99;k.x+=k.vx;k.y+=k.vy;k.r+=k.vr;k.l-=.004;
+  g2.save();g2.translate(k.x,k.y);g2.rotate(k.r);g2.fillStyle=k.c;g2.globalAlpha=Math.min(1,k.l*2);g2.fillRect(-k.w/2,-k.h/2,k.w,k.h);g2.restore()}
+ requestAnimationFrame(loop);
+}
+tick();setInterval(tick,1000);loop();
+</script></body></html>
