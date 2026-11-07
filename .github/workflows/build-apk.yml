@@ -14,17 +14,217 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Build APK
+      - name: Use fixed signing key
+        run: mkdir -p ~/.android && cp debug.keystore ~/.android/debug.keystore
+      - name: Create Android project
         run: |
           mkdir www && cp index.html www/
           npm init -y
           npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
-          npx cap init Ember com.ember.streak --web-dir www
+          npx cap init Forge com.forge.discipline --web-dir www
           npx cap add android
-          sed -i 's|<item name="windowActionBar">false</item>|&<item name="android:statusBarColor">#070b18</item><item name="android:navigationBarColor">#070b18</item>|' android/app/src/main/res/values/styles.xml
+          sed -i 's|<item name="windowActionBar">false</item>|&<item name="android:statusBarColor">#08090b</item><item name="android:navigationBarColor">#08090b</item>|' android/app/src/main/res/values/styles.xml
+      - name: Add widgets, icon and native bridge
+        run: |
+          A=android/app/src/main
+          J=$A/java/com/forge/discipline
+          mkdir -p $A/res/drawable $A/res/layout $A/res/xml $A/res/values $A/res/mipmap-anydpi-v26
+          cat > $J/MainActivity.java <<'EOT'
+          package com.forge.discipline;
+
+          import android.content.Context;
+          import android.content.Intent;
+          import android.os.Bundle;
+          import android.webkit.JavascriptInterface;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle b) {
+              super.onCreate(b);
+              final Context ctx = getApplicationContext();
+              final MainActivity me = this;
+              getBridge().getWebView().addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public void push(String json) {
+                  ctx.getSharedPreferences("forge", 0).edit().putString("data", json).apply();
+                  ForgeWidget.refresh(ctx);
+                }
+                @JavascriptInterface
+                public String pending() {
+                  Intent in = me.getIntent();
+                  String g = in == null ? null : in.getStringExtra("go");
+                  if (in != null) in.removeExtra("go");
+                  return g == null ? "" : g;
+                }
+              }, "ForgeNative");
+            }
+            @Override
+            public void onNewIntent(Intent i) {
+              super.onNewIntent(i);
+              setIntent(i);
+            }
+          }
+          EOT
+          cat > $J/ForgeWidget.java <<'EOT'
+          package com.forge.discipline;
+
+          import android.app.PendingIntent;
+          import android.appwidget.AppWidgetManager;
+          import android.appwidget.AppWidgetProvider;
+          import android.content.ComponentName;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.widget.RemoteViews;
+          import org.json.JSONObject;
+
+          public class ForgeWidget extends AppWidgetProvider {
+            @Override
+            public void onUpdate(Context c, AppWidgetManager m, int[] ids) { refresh(c); }
+
+            static PendingIntent open(Context c, String go, int code) {
+              Intent i = new Intent(c, MainActivity.class);
+              i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+              i.putExtra("go", go);
+              return PendingIntent.getActivity(c, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            }
+
+            static void refresh(Context c) {
+              AppWidgetManager m = AppWidgetManager.getInstance(c);
+              JSONObject d;
+              try { d = new JSONObject(c.getSharedPreferences("forge", 0).getString("data", "{}")); } catch (Exception e) { d = new JSONObject(); }
+              long start = d.optLong("start", 0);
+              long days = start > 0 ? Math.max(0, (System.currentTimeMillis() - start) / 86400000L) : 0;
+              int done = d.optInt("done", 0);
+              int total = Math.max(1, d.optInt("total", 1));
+              int prot = d.optInt("prot", 0);
+              int goal = Math.max(1, d.optInt("goal", 1));
+              for (int id : m.getAppWidgetIds(new ComponentName(c, ForgeWidget.class))) {
+                RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_forge);
+                v.setTextViewText(R.id.w_rank, d.optString("rank", "Recruit"));
+                v.setTextViewText(R.id.w_days, String.valueOf(days));
+                v.setTextViewText(R.id.w_tasks_txt, "Tasks " + done + "/" + total);
+                v.setProgressBar(R.id.w_tasks_bar, 100, Math.min(100, done * 100 / total), false);
+                v.setTextViewText(R.id.w_prot_txt, "Protein " + prot + "/" + goal + " g");
+                v.setProgressBar(R.id.w_prot_bar, 100, Math.min(100, prot * 100 / goal), false);
+                v.setOnClickPendingIntent(R.id.w_root, open(c, "", 1));
+                v.setOnClickPendingIntent(R.id.w_panic, open(c, "panic", 2));
+                m.updateAppWidget(id, v);
+              }
+              for (int id : m.getAppWidgetIds(new ComponentName(c, ForgeSmall.class))) {
+                RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_small);
+                v.setTextViewText(R.id.s_days, String.valueOf(days));
+                v.setOnClickPendingIntent(R.id.s_root, open(c, "streak", 3));
+                v.setOnClickPendingIntent(R.id.s_panic, open(c, "panic", 4));
+                m.updateAppWidget(id, v);
+              }
+            }
+          }
+          EOT
+          cat > $J/ForgeSmall.java <<'EOT'
+          package com.forge.discipline;
+
+          import android.appwidget.AppWidgetManager;
+          import android.appwidget.AppWidgetProvider;
+          import android.content.Context;
+
+          public class ForgeSmall extends AppWidgetProvider {
+            @Override
+            public void onUpdate(Context c, AppWidgetManager m, int[] ids) { ForgeWidget.refresh(c); }
+          }
+          EOT
+          cat > $A/res/layout/widget_forge.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/w_root" android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:padding="12dp" android:background="@drawable/widget_bg">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+              <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="FORGE" android:textColor="#d4af6a" android:textSize="12sp" android:textStyle="bold"/>
+              <TextView android:id="@+id/w_rank" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#ece7dd" android:textSize="12sp" android:textStyle="bold"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+              <TextView android:id="@+id/w_days" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#ece7dd" android:textSize="36sp" android:textStyle="bold"/>
+              <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:paddingLeft="6dp" android:text="days clean" android:textColor="#8d897f" android:textSize="12sp"/>
+              <TextView android:id="@+id/w_panic" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingLeft="14dp" android:paddingRight="14dp" android:paddingTop="7dp" android:paddingBottom="7dp" android:background="@drawable/widget_btn" android:text="PANIC" android:textColor="#ffffff" android:textSize="12sp" android:textStyle="bold"/>
+            </LinearLayout>
+            <TextView android:id="@+id/w_tasks_txt" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#ece7dd" android:textSize="11sp"/>
+            <ProgressBar android:id="@+id/w_tasks_bar" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:max="100" android:progressTint="#d4af6a" android:progressBackgroundTint="#33ffffff"/>
+            <TextView android:id="@+id/w_prot_txt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="#ece7dd" android:textSize="11sp"/>
+            <ProgressBar android:id="@+id/w_prot_bar" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:max="100" android:progressTint="#ff6a3d" android:progressBackgroundTint="#33ffffff"/>
+          </LinearLayout>
+          EOT
+          cat > $A/res/layout/widget_small.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/s_root" android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:gravity="center" android:padding="10dp" android:background="@drawable/widget_bg">
+            <TextView android:id="@+id/s_days" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#ece7dd" android:textSize="40sp" android:textStyle="bold"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="days clean" android:textColor="#8d897f" android:textSize="12sp"/>
+            <TextView android:id="@+id/s_panic" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:paddingLeft="16dp" android:paddingRight="16dp" android:paddingTop="7dp" android:paddingBottom="7dp" android:background="@drawable/widget_btn" android:text="PANIC" android:textColor="#ffffff" android:textSize="12sp" android:textStyle="bold"/>
+          </LinearLayout>
+          EOT
+          cat > $A/res/drawable/widget_bg.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+            <solid android:color="#F00B0C10"/>
+            <corners android:radius="22dp"/>
+            <stroke android:width="1dp" android:color="#44d4af6a"/>
+          </shape>
+          EOT
+          cat > $A/res/drawable/widget_btn.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+            <solid android:color="#ff2d55"/>
+            <corners android:radius="14dp"/>
+          </shape>
+          EOT
+          cat > $A/res/xml/forge_widget_info.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="250dp" android:minHeight="110dp" android:updatePeriodMillis="1800000"
+              android:initialLayout="@layout/widget_forge" android:resizeMode="horizontal|vertical"
+              android:widgetCategory="home_screen"/>
+          EOT
+          cat > $A/res/xml/forge_small_info.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="110dp" android:minHeight="110dp" android:updatePeriodMillis="1800000"
+              android:initialLayout="@layout/widget_small" android:resizeMode="none"
+              android:widgetCategory="home_screen"/>
+          EOT
+          cat > $A/res/values/forge_colors.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources><color name="forge_bg">#08090b</color></resources>
+          EOT
+          cat > $A/res/drawable/forge_fg.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+            <path android:pathData="M54,28 L77,41 L77,67 L54,80 L31,67 L31,41 Z" android:strokeColor="#d4af6a" android:strokeWidth="3" android:fillColor="#22d4af6a"/>
+            <path android:pathData="M42,60 L54,67 L66,60" android:strokeColor="#e6c985" android:strokeWidth="3.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+            <path android:pathData="M42,51 L54,58 L66,51" android:strokeColor="#e6c985" android:strokeWidth="3.5" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+          </vector>
+          EOT
+          for n in ic_launcher ic_launcher_round; do
+          cat > $A/res/mipmap-anydpi-v26/$n.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@color/forge_bg"/>
+            <foreground android:drawable="@drawable/forge_fg"/>
+          </adaptive-icon>
+          EOT
+          done
+          python3 - <<'PY'
+          p='android/app/src/main/AndroidManifest.xml'
+          s=open(p).read()
+          r='<receiver android:name=".ForgeWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/forge_widget_info"/></receiver><receiver android:name=".ForgeSmall" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/forge_small_info"/></receiver>'
+          assert '</application>' in s
+          open(p,'w').write(s.replace('</application>', r+'</application>'))
+          PY
+      - name: Build APK
+        run: |
           npx cap sync android
           cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: Ember-APK
+          name: Forge-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
