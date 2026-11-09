@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="theme-color" content="#08090b"><title>Forge</title>
+<meta name="theme-color" content="#08090b"><meta name="color-scheme" content="dark"><title>Forge</title>
 <style>
-:root{--h:28;--g:#d4af6a;--m:#8d897f;--t:#ece7dd}
+:root{--h:28;--g:#d4af6a;--m:#8d897f;--t:#ece7dd;color-scheme:dark}
 *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:#08090b;color:var(--t);font-family:Roboto,"Segoe UI",system-ui,sans-serif;overflow:hidden}
 .cn{font-family:sans-serif-condensed,"Roboto Condensed","Arial Narrow",Roboto,sans-serif}
@@ -126,6 +126,21 @@ nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stro
 .rst{display:flex;gap:8px;align-items:center;margin-top:12px}.rst button{padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.07);font-size:13px;font-weight:700}
 .tg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.tg input{margin:0}.tg .btn{margin:0}
 .ex[onclick]{cursor:pointer}
+.reactor{position:relative;width:min(82vw,320px);aspect-ratio:1;margin:12px auto 4px}
+.reactor::before{content:"";position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle,hsl(var(--h) 100% 50%/.32),transparent 68%);animation:gl 4s ease-in-out infinite}
+.reactor svg{position:absolute;inset:0;width:100%;height:100%}
+.r1{transform-origin:150px 150px;animation:sp 50s linear infinite}.r2{transform-origin:150px 150px;animation:sp 28s linear infinite reverse}
+.reactor .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-shadow:0 2px 14px #000b}
+.tk{stroke:rgba(255,255,255,.2);stroke-width:2;stroke-linecap:round}
+.t2{display:flex;justify-content:space-between;font-size:14px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal i{aspect-ratio:1;border-radius:9px;display:grid;place-items:center;font-style:normal;font-size:12px;color:#5d5a52;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
+.cal i.on{color:#14100a;font-weight:700;background:linear-gradient(135deg,#b8923f,#f0d79a);border-color:transparent;box-shadow:0 0 12px -2px rgba(212,175,106,.6)}
+.cal i.sl{background:rgba(255,45,85,.25);color:#ff6a85;border-color:rgba(255,45,85,.5)}.cal i.fu{opacity:.25}.cal i.n{outline:2px solid #fff;outline-offset:1px}
+.lvs{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scroll-snap-type:x mandatory}.lvs::-webkit-scrollbar{display:none}
+.lc{flex:none;width:112px;scroll-snap-align:center;border-radius:16px;padding:12px 8px;text-align:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);opacity:.45}
+.lc.d{opacity:1}.lc.c{opacity:1;border-color:var(--c);box-shadow:0 0 22px -4px var(--c)}
+.lc b{display:block;margin-top:6px;font-size:15px}.lc small{color:var(--m);font-size:11px}
 </style></head><body>
 <div id="bg"><i></i><i></i><i></i></div><canvas id="fx"></canvas><div class="grain"></div><div class="vig"></div><canvas id="cf"></canvas>
 <div id="app">
@@ -133,6 +148,7 @@ nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stro
 <div class="hd"><div><p class="mut" id="gr"></p><h1 class="cn" id="nm"></h1></div><span class="rk" id="rkc"></span></div>
 <div class="card hero"><div id="emb"></div><div style="flex:1"><div class="rn cn" id="rn"></div><div class="bar"><i id="xb"></i></div><small class="mut" id="xt"></small></div></div>
 <div class="tri"><div class="card"><b class="cn" id="tp">0%</b><small>Today</small></div><div class="card" onclick="go('streak')"><b class="cn" id="cdd">0</b><small>Clean days</small></div><div class="card"><b class="cn" id="dsd">0</b><small>Discipline streak</small></div></div>
+<div class="card" id="dgr" style="display:none;border-color:rgba(255,45,85,.55)"></div>
 <div class="card"><h3>Mission of the day</h3><input id="msn" placeholder="The one thing that makes today a win" oninput="saveMs(this.value)" style="margin-top:0"></div>
 <div id="hl"></div>
 <div class="row"><button class="ghost" id="ebtn" onclick="togEdit()">Edit habits</button><button class="ghost" onclick="$('am').classList.add('on')">+ Add habit</button></div>
@@ -153,7 +169,7 @@ nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stro
 <div class="mb"><div class="t2"><span>Calories</span><b id="fk"></b></div><div class="bar"><i id="fkb"></i></div></div>
 <div class="mb"><div class="t2"><span>Water</span><b id="fw"></b></div><div class="bar"><i id="fwb" style="background:linear-gradient(90deg,#2d5fb8,#6fb1ff)"></i></div><button class="btn" onclick="addWater()">+ 0.5 L water</button></div></div>
 <div class="card"><h3>Quick add</h3><div class="fg" id="fg"></div></div>
-<div class="card"><h3>Add a meal</h3><input id="fai" placeholder="Describe it: 3 eggs, 2 rotis and dal" style="margin-top:0"><button class="btn" id="faib" onclick="aiMeal()">Estimate with AI and add</button>
+<div class="card"><h3>Add a meal</h3><input id="fai" placeholder="Describe it: 3 eggs, 2 rotis and dal" style="margin-top:0"><button class="btn" id="faib" onclick="aiMeal()">Smart add</button>
 <div class="tg"><input id="fn" placeholder="Name"><input id="fpi" type="number" inputmode="numeric" placeholder="Protein g"><input id="fki" type="number" inputmode="numeric" placeholder="Calories"><button class="btn" onclick="customFood()">Add manually</button></div></div>
 <div class="card"><h3>Today's meals</h3><div id="fm"></div></div>
 </section>
@@ -170,28 +186,39 @@ nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stro
 </section>
 
 <section class="tab" id="t-streak">
-<h2 class="t cn">Control</h2><p class="mut">Mastery over urges is the foundation of everything else.</p>
-<div class="orb" id="orb"><svg viewBox="0 0 260 260">
-<circle class="spin" cx="130" cy="130" r="126" fill="none" stroke="hsl(var(--h) 100% 70%)" stroke-opacity=".4" stroke-width="2" stroke-dasharray="2 11" stroke-linecap="round"/>
-<circle cx="130" cy="130" r="114" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="10"/>
-<circle id="ring" cx="130" cy="130" r="114" fill="none" stroke="hsl(var(--h) 100% 62%)" stroke-width="10" stroke-linecap="round" stroke-dasharray="716.3" stroke-dashoffset="716.3" transform="rotate(-90 130 130)" style="transition:stroke-dashoffset 1s linear;filter:drop-shadow(0 0 8px hsl(var(--h) 100% 55%))"/></svg>
-<div class="c" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><div class="lv" id="lv">Spark</div><div class="days cn" id="d">0</div><small class="mut">days clean</small><div id="hms" style="margin-top:6px;font-size:18px;font-variant-numeric:tabular-nums">00:00:00</div></div></div>
-<p class="mut" id="next" style="text-align:center"></p>
-<div class="card"><h3>Levels</h3><div class="map" id="map"></div></div>
+<div class="hd"><div><p class="mut">No-fap discipline</p><h1 class="cn">Control</h1></div><span class="rk" id="lvc">Spark</span></div>
+<div class="reactor" id="orb"><svg viewBox="0 0 300 300">
+<defs><linearGradient id="gr1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:hsl(var(--h) 100% 62%)"/><stop offset="1" stop-color="#fff3c9"/></linearGradient></defs>
+<g id="ticks"></g>
+<circle class="r1" cx="150" cy="150" r="134" fill="none" stroke="#d4af6a" stroke-opacity=".35" stroke-width="2" stroke-dasharray="2 12" stroke-linecap="round"/>
+<circle class="r2" cx="150" cy="150" r="104" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.5" stroke-dasharray="30 18"/>
+<circle cx="150" cy="150" r="122" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="8"/>
+<circle id="ring" cx="150" cy="150" r="122" fill="none" stroke="url(#gr1)" stroke-width="8" stroke-linecap="round" stroke-dasharray="766.5" stroke-dashoffset="766.5" transform="rotate(-90 150 150)" style="transition:stroke-dashoffset 1s linear"/>
+<circle id="spark" cx="150" cy="28" r="6" fill="#fff" style="filter:drop-shadow(0 0 8px #fff)"/></svg>
+<div class="c"><div class="lv" id="lv">Spark</div><div class="days cn" id="d">0</div><small class="mut">days clean</small><div id="hms" style="margin-top:6px;font-size:18px;font-variant-numeric:tabular-nums">00:00:00</div></div></div>
+<div class="card"><div class="t2"><span id="nxn">Next</span><b id="pgt">0%</b></div><div class="bar"><i id="pgb"></i></div><p class="mut" id="nxd"></p></div>
+<button class="btn" id="cib" onclick="checkin()">I stayed strong today</button>
+<div class="card"><h3>Last 28 days</h3><div class="cal" id="cal"></div></div>
+<div class="card"><h3>Why I am doing this</h3><textarea id="vow" placeholder="Write your reasons. You will see them when you press panic." oninput="saveVow(this.value)" style="margin-top:0"></textarea></div>
+<div class="card"><h3>Urge pattern</h3><div class="bars" id="dng"></div><p class="mut" id="dnt" style="margin-top:8px"></p></div>
+<div class="card"><h3>Levels</h3><div class="lvs" id="lvs"></div></div>
 <div class="row"><button class="ghost" onclick="$('md').classList.add('on')">I slipped. Reset</button><button class="ghost" onclick="openSetup(true)">Change start</button></div>
 </section>
 
 <section class="tab" id="t-rank">
-<h2 class="t cn">Coach</h2><p class="mut">Your AI coach knows your numbers. Needs your own API key (below).</p>
+<h2 class="t cn">Coach</h2><p class="mut">Ghost, your built-in coach. Free, offline and private. It reads your own data.</p>
 <div class="card"><div class="pl"><button onclick="coach('review')">Weekly review</button><button onclick="coach('plan')">Tomorrow</button><button onclick="coach('push')">Motivate me</button></div>
 <textarea id="cq" placeholder="Ask about training, food or discipline"></textarea><button class="btn" onclick="coach('ask')">Ask coach</button><div class="out" id="cout"></div></div>
 <div style="text-align:center;margin-top:6px"><div id="bemb" style="display:inline-block"></div><div class="rn cn" id="brn" style="margin-top:6px"></div><small class="mut" id="bxt"></small></div>
 <div class="card"><h3>Ranks</h3><div id="lad"></div></div>
 <div class="card"><h3>Last 28 days</h3><div class="heat" id="heat"></div></div>
 <div class="grid" id="stg"></div>
-<div class="card"><h3>Profile and backup</h3><input id="nmi" placeholder="Your name"><div class="tg"><input id="pgi" type="number" inputmode="numeric" placeholder="Protein goal g"><input id="kci" type="number" inputmode="numeric" placeholder="Calorie goal"></div><input id="keyi" type="password" placeholder="Anthropic API key (optional)"><button class="btn" onclick="saveName()">Save settings</button>
+<div class="card"><h3>Restore old Ember records</h3><p class="mut">Open your old Ember app, read the numbers on its Stats tab and type them here. Leave blank what you do not want to change.</p>
+<div class="tg"><input id="ro-d" type="number" inputmode="numeric" placeholder="Days clean now"><input id="ro-h" type="number" inputmode="numeric" placeholder="Extra hours"><input id="ro-b" type="number" inputmode="decimal" placeholder="Best streak (days)"><input id="ro-u" type="number" inputmode="numeric" placeholder="Urges beaten"><input id="ro-r" type="number" inputmode="numeric" placeholder="Resets"><input id="ro-p" placeholder="Past streaks e.g. 5, 12"></div>
+<button class="btn" onclick="restoreOld()">Restore records</button></div>
+<div class="card"><h3>Profile and backup</h3><input id="nmi" placeholder="Your name"><div class="tg"><input id="pgi" type="number" inputmode="numeric" placeholder="Protein goal g"><input id="kci" type="number" inputmode="numeric" placeholder="Calorie goal"></div><input id="keyi" type="password" placeholder="Advanced: Claude API key (optional)"><button class="btn" onclick="saveName()">Save settings</button>
 <textarea id="bk" placeholder="Backup text appears here. Paste a backup here to restore."></textarea>
-<div class="row"><button class="ghost" onclick="expB()">Copy backup</button><button class="ghost" onclick="resB()">Restore</button></div></div>
+<div class="row"><button class="ghost" onclick="shareB()">Share backup</button><button class="ghost" onclick="expB()">Copy</button><button class="ghost" onclick="resB()">Restore</button></div></div>
 </section>
 </div>
 
@@ -240,10 +267,12 @@ const PLAN={1:['Push day',[['Push-ups','4 x 15-25'],['Pike push-ups','4 x 8-12']
 5:['Power day',[['Burpees','5 x 10'],['Jump squats','4 x 15'],['Decline push-ups (feet on chair)','4 x 12'],['Hollow hold','3 x 40s'],['Mountain climbers','3 x 45s']]],
 6:['Conditioning',[['Sprints or stair intervals','10 x 30s'],['100 push-ups for time','1 round'],['Squat jumps','3 x 20'],['Core circuit','10 min']]],
 0:['Rest and plan',[['Stretch and walk','30 min'],['Plan the week','10 min'],['Prep meals','as needed']]]};
+try{if(!localStorage.getItem('forge')&&window.ForgeNative&&ForgeNative.loadFull){const f=ForgeNative.loadFull();if(f)localStorage.setItem('forge',f)}}catch(e){}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 let S={};try{S=JSON.parse(localStorage.getItem('forge'))||{}}catch(e){}
 S.habits=S.habits||HAB.map(h=>({id:h[0],t:h[1],p:h[2],x:h[3]}));
 ['done','pct','foc','jr','wk'].forEach(k=>S[k]=S[k]||{});S.w=S.w||[];S.hist=S.hist||[];S.xp=S.xp||0;
-const save=()=>{try{localStorage.setItem('forge',JSON.stringify(S))}catch(e){}};
+const save=()=>{const j=JSON.stringify(S);try{localStorage.setItem('forge',j)}catch(e){}try{window.ForgeNative&&ForgeNative.saveFull&&ForgeNative.saveFull(j)}catch(e){}};
 const rankOf=x=>{let i=0;RK.forEach((r,k)=>{if(x>=r[0])i=k});return i};
 const lvlOf=d=>{let i=0;LV.forEach((l,k)=>{if(d>=l[0])i=k});return i};
 let H=28,curI=0,shown=-1,lastD=-1,EDIT=false,AP='mind',FL=25,F={run:false,end:0,len:0},DK=dk();
@@ -270,7 +299,7 @@ function renderToday(){
  const s=stat();
  $('hl').innerHTML=Object.keys(PIL).map(p=>{const hs=S.habits.filter(h=>h.p===p);if(!hs.length)return'';
   return `<div class="grp" style="--c:${PIL[p][1]}"><div class="gh cn"><span>${PIL[p][0]}</span><em id="gc-${p}"></em></div>`+hs.map(h=>`<div class="hb${s.a.includes(h.id)?' on':''}" data-h="${h.id}" onclick="tog('${h.id}')"><span class="ck"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><span class="ht">${h.t}</span><span class="xp">+${h.x}</span>${EDIT?`<button class="x" onclick="event.stopPropagation();delH('${h.id}')">✕</button>`:''}</div>`).join('')+'</div>'}).join('');
- $('qd').textContent=QS[dayIdx()%QS.length];$('msn').value=S.ms[dk()]||'';renderHead();
+ $('qd').textContent=QS[dayIdx()%QS.length];$('msn').value=S.ms[dk()]||'';dangerBanner();renderHead();
 }
 const dayIdx=()=>Math.floor((Date.now()-new Date().getTimezoneOffset()*6e4)/864e5);
 function tog(id){const k=dk(),a=S.done[k]=S.done[k]||[],h=S.habits.find(x=>x.id===id);if(!h)return;
@@ -314,21 +343,39 @@ function fdone(){F.run=false;const k=dk();S.foc[k]=(S.foc[k]||0)+F.len;addXP(F.l
  if(S.foc[k]>=90&&!(S.done[k]||[]).includes('m2'))tog('m2');save();toast('Focus complete: '+F.len+' min');renderFocus();renderHead()}
 function saveJ(){const t=$('jt').value.trim();if(!t)return;S.jr[dk()]=t;save();if(!(S.done[dk()]||[]).includes('a4'))tog('a4');toast('Debrief saved')}
 
-function buildMap(i){$('map').innerHTML=LV.map((l,k)=>`<div class="node ${k<i?'done':k===i?'cur':'lock'}" style="--c:hsl(${l[2]} 90% 52%)"><div class="dot">${k<i?'✓':k===i?'★':l[0]}</div><div><h3>${l[1]}</h3><p>${l[0]?l[0]+(l[0]>1?' days':' day'):'Start'}: ${l[3]}</p></div></div>`).join('')}
+function initTicks(){let h='';for(let i=0;i<60;i++){const a=i*Math.PI/30,c=Math.cos(a),n=Math.sin(a);h+=`<line class="tk" x1="${(150+143*n).toFixed(1)}" y1="${(150-143*c).toFixed(1)}" x2="${(150+149*n).toFixed(1)}" y2="${(150-149*c).toFixed(1)}"/>`}$('ticks').innerHTML=h}
 function tick(){
  extra();
- if(DK!==dk()){DK=dk();renderToday();renderTrain();renderFocus()}
+ if(DK!==dk()){DK=dk();renderToday();renderTrain();renderFocus();renderFuel()}
  if(!S.start){$('ob').classList.add('on');return}
  const ms=Math.max(0,Date.now()-S.start),days=ms/864e5,i=lvlOf(days);
  if(S.lvl===undefined)S.lvl=i;curI=i;H=LV[i][2];document.documentElement.style.setProperty('--h',H);
  if(i>S.lvl){S.lvl=i;save();showLU('Control level up',LV[i][1])}
  const d=Math.floor(days),h=Math.floor(ms/36e5)%24,m=Math.floor(ms/6e4)%60,s=Math.floor(ms/1e3)%60;
  $('d').textContent=d;$('cdd').textContent=d;if(d!==lastD){lastD=d;$('d').classList.remove('pop');void $('d').offsetWidth;$('d').classList.add('pop')}
- $('hms').textContent=pad(h)+':'+pad(m)+':'+pad(s);$('lv').textContent=LV[i][1];
- const nx=LV[i+1],p=nx?(days-LV[i][0])/(nx[0]-LV[i][0]):1,left=nx?Math.ceil(nx[0]-days):0;
- $('ring').style.strokeDashoffset=716.3*(1-Math.min(1,p));$('next').textContent=nx?`${left} day${left===1?'':'s'} to ${nx[1]}`:'Max level. You are Immortal.';
- if(shown!==i){buildMap(i);shown=i}
- if(F.run){const rem=F.end-Date.now();if(rem<=0)fdone();else{$('ftime').textContent=pad(Math.floor(rem/6e4))+':'+pad(Math.floor(rem/1e3)%60);$('fring').style.strokeDashoffset=628.3*(1-(1-rem/(F.len*6e4)));$('fsub').textContent='Stay silent. Stay locked in.'}}
+ $('hms').textContent=pad(h)+':'+pad(m)+':'+pad(s);$('lv').textContent=LV[i][1];$('lvc').textContent=LV[i][1];
+ const nx=LV[i+1],p=Math.min(1,nx?(days-LV[i][0])/(nx[0]-LV[i][0]):1),left=nx?Math.ceil(nx[0]-days):0;
+ $('ring').style.strokeDashoffset=766.5*(1-p);
+ const a=-Math.PI/2+p*2*Math.PI;$('spark').setAttribute('cx',(150+122*Math.cos(a)).toFixed(1));$('spark').setAttribute('cy',(150+122*Math.sin(a)).toFixed(1));
+ const L=$('ticks').children;for(let k=0;k<L.length;k++){const q=(s-k+60)%60;L[k].style.stroke=q<10?`hsla(${H},100%,70%,${(1-q/10).toFixed(2)})`:'';L[k].style.strokeWidth=q===0?'3.5':''}
+ $('pgb').style.width=Math.round(p*100)+'%';$('pgt').textContent=Math.round(p*100)+'%';
+ $('nxn').textContent=nx?'Next: '+nx[1]:'Max level';$('nxd').textContent=nx?`${left} day${left===1?'':'s'} left. ${nx[3]}.`:'You reached Immortal. Hold the standard.';
+ if(shown!==i){buildLv(i);shown=i}
+ if(F.run){const rem=F.end-Date.now();if(rem<=0)fdone();else{$('ftime').textContent=pad(Math.floor(rem/6e4))+':'+pad(Math.floor(rem/1e3)%60);$('fring').style.strokeDashoffset=628.3*rem/(F.len*6e4);$('fsub').textContent='Stay silent. Stay locked in.'}}
+}
+function buildLv(i){$('lvs').innerHTML=LV.map((l,k)=>`<div class="lc ${k<i?'d':k===i?'c':''}" style="--c:hsl(${l[2]} 90% 58%)"><svg width="46" height="46" viewBox="0 0 100 100"><polygon points="50,4 92,27 92,73 50,96 8,73 8,27" fill="hsla(${l[2]},90%,55%,.18)" stroke="hsl(${l[2]} 90% 60%)" stroke-width="5"/><text x="50" y="66" text-anchor="middle" font-size="46" font-weight="700" fill="hsl(${l[2]} 90% 72%)">${k<i?'✓':k===i?'★':k+1}</text></svg><b class="cn">${l[1]}</b><small>${l[0]?l[0]+' days':'Start'}</small></div>`).join('')}
+function saveVow(v){S.vow=v;save()}
+function checkin(){const k=dk();if(S.ci[k])return;S.ci[k]=1;save();if(!(S.done[k]||[]).includes('c1'))tog('c1');burst(150);vib([60,40,120]);toast('Day locked in');renderStreak()}
+const HRS=['12am to 3am','3am to 6am','6am to 9am','9am to 12pm','12pm to 3pm','3pm to 6pm','6pm to 9pm','9pm to 12am'];
+function urgeB(){const b=new Array(8).fill(0);S.ug.forEach(t=>b[Math.floor(new Date(t).getHours()/3)]++);const tot=b.reduce((a,c)=>a+c,0),mx=Math.max(...b);return{b,tot,mx,top:b.indexOf(mx)}}
+function dangerBanner(){const e=$('dgr'),u=urgeB(),c=Math.floor(new Date().getHours()/3);
+ if(u.tot>=3&&u.b[c]>=Math.max(2,u.mx*.7)){e.style.display='';e.innerHTML=`<h3 style="color:#ff6a85">Danger window</h3><p>Your urges peak between ${HRS[c]}. Stay in public space, keep moving, phone away from bed. Press PANIC early.</p>`}else e.style.display='none'}
+function renderStreak(){
+ const k=dk(),st=S.start?new Date(S.start):null,s0=st?new Date(st.getFullYear(),st.getMonth(),st.getDate()).getTime():0;
+ $('cal').innerHTML=[...Array(28)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-(27-i));d.setHours(0,0,0,0);const key=dk(d),cl=d.getTime()>Date.now()?'fu':S.slips.includes(key)?'sl':d.getTime()>=s0?'on':'';return `<i class="${cl}${key===k?' n':''}">${d.getDate()}</i>`}).join('');
+ $('vow').value=S.vow||'';const dn=!!S.ci[k];$('cib').disabled=dn;$('cib').textContent=dn?'Today is locked in':'I stayed strong today';
+ const u=urgeB();$('dng').innerHTML=u.b.map((v,i)=>`<div><i style="height:${Math.round(v/Math.max(1,u.mx)*60)}px"></i>${['12a','3a','6a','9a','12p','3p','6p','9p'][i]}</div>`).join('');
+ $('dnt').textContent=u.tot<3?'Press PANIC when an urge hits. After a few logs I will find your danger hours.':`Most urges: ${HRS[u.top]}. Plan something active in that window.`;
 }
 function renderRank(){
  const ri=rankOf(S.xp),nx=RK[ri+1];$('bemb').innerHTML=emblem(ri,120);$('brn').textContent=RK[ri][1];$('bxt').textContent=nx?`${S.xp} XP, ${nx[0]-S.xp} to ${nx[1]}`:`${S.xp} XP`;
@@ -336,27 +383,28 @@ function renderRank(){
  $('heat').innerHTML=[...Array(28)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-(27-i));const p=S.pct[dk(d)]||0;return `<i class="${p?'':'z'}${i===27?' n':''}" style="--a:${(.15+p/100*.85).toFixed(2)};animation-delay:${i*25}ms"></i>`}).join('');
  const ms=S.start?Date.now()-S.start:0,best=Math.max(S.best||0,ms),tasks=Object.values(S.done).reduce((a,b)=>a+b.length,0),foc=Object.values(S.foc).reduce((a,b)=>a+b,0);
  const st=[[tasks,'Tasks done'],[(foc/60).toFixed(1),'Focus hours'],[Object.keys(S.wk).length,'Workouts'],[dstreak(),'Discipline streak'],[(best/864e5).toFixed(1),'Best clean streak'],[S.urges||0,'Urges beaten'],[S.resets||0,'Resets'],[Object.keys(S.pct).length,'Days tracked']];
- $('stg').innerHTML=st.map(x=>`<div class="card"><b class="cn">${x[0]}</b><span>${x[1]}</span></div>`).join('');$('nmi').value=S.name||'';$('pgi').value=S.pg||'';$('kci').value=S.kc||'';$('keyi').placeholder=S.key?'Key saved. Paste a new one to replace':'Anthropic API key (optional)';
+ $('stg').innerHTML=st.map(x=>`<div class="card"><b class="cn">${x[0]}</b><span>${x[1]}</span></div>`).join('');$('nmi').value=S.name||'';$('pgi').value=S.pg||'';$('kci').value=S.kc||'';$('keyi').placeholder=S.key?'Key saved. Paste a new one to replace':'Advanced: Claude API key (optional)';
 }
 function saveName(){S.name=$('nmi').value.trim();S.pg=+$('pgi').value||0;S.kc=+$('kci').value||0;const k=$('keyi').value.trim();if(k){S.key=k;$('keyi').value=''}save();renderHead();renderFuel();toast('Saved')}
-function expB(){const o={...S};delete o.key;const t=JSON.stringify(o);$('bk').value=t;try{navigator.clipboard.writeText(t).then(()=>toast('Backup copied'),()=>toast('Select and copy the text'))}catch(e){toast('Select and copy the text')}}
+function shareB(){const o={...S};delete o.key;const t=JSON.stringify(o);S.lastB=Date.now();save();if(window.ForgeNative&&ForgeNative.share)ForgeNative.share(t);else expB()}
+function expB(){S.lastB=Date.now();const o={...S};delete o.key;const t=JSON.stringify(o);$('bk').value=t;try{navigator.clipboard.writeText(t).then(()=>toast('Backup copied'),()=>toast('Select and copy the text'))}catch(e){toast('Select and copy the text')}}
 function resB(){try{const o=JSON.parse($('bk').value);if(!o||typeof o!=='object')throw 0;o.key=S.key;S=o;save();location.reload()}catch(e){toast('Invalid backup')}}
 
 function go(t){document.querySelectorAll('.tab').forEach(e=>{const on=e.id==='t-'+t;e.classList.toggle('on',on);e.classList.remove('enter');if(on){void e.offsetWidth;e.classList.add('enter');setTimeout(()=>e.classList.remove('enter'),900)}});
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));$('app').scrollTop=0;
- ({today:renderToday,train:renderTrain,focus:renderFocus,streak:()=>{shown=-1;tick()},fuel:renderFuel,rank:renderRank})[t]()}
+ ({today:renderToday,train:renderTrain,focus:renderFocus,streak:()=>{shown=-1;tick();renderStreak();setTimeout(()=>{const c=document.querySelector('.lc.c');c&&c.scrollIntoView({inline:'center',block:'nearest'})},60)},fuel:renderFuel,rank:renderRank})[t]()}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
 
 $('obg').onclick=()=>{const d=+$('od').value||0,h=+$('oh').value||0;S.name=$('on').value.trim()||'Operator';S.start=Date.now()-(d*864e5+h*36e5);S.best=(+$('ob2').value||0)*864e5;S.urges=+$('ou').value||0;S.lvl=lvlOf(d);save();$('ob').classList.remove('on');shown=-1;renderToday();tick()};
 function openSetup(){$('sd').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);$('so').classList.add('on')}
 $('sg').onclick=()=>{let ts=$('sd').value?new Date($('sd').value).getTime():Date.now();if(!(ts<=Date.now()))ts=Date.now();S.start=ts;S.lvl=lvlOf((Date.now()-ts)/864e5);save();shown=-1;$('so').classList.remove('on');tick()};
-$('my').onclick=()=>{const ms=Date.now()-S.start;S.hist=S.hist.concat(ms>6e4?[ms]:[]);S.best=Math.max(S.best||0,ms);S.resets=(S.resets||0)+1;S.start=Date.now();S.lvl=0;save();shown=-1;$('md').classList.remove('on');tick();toast('New start. You are still in this.')};
+$('my').onclick=()=>{const ms=Date.now()-S.start;S.hist=S.hist.concat(ms>6e4?[ms]:[]);S.best=Math.max(S.best||0,ms);S.resets=(S.resets||0)+1;S.slips.push(dk());S.start=Date.now();S.lvl=0;save();shown=-1;$('md').classList.remove('on');tick();toast('New start. You are still in this.')};
 
 const TS=['Stand up and do 20 push-ups right now.','Leave the room. Walk outside for 5 minutes.','Splash cold water on your face and drink a glass of water.','Text or call a friend. Do not sit alone with the urge.','Put your phone down and tidy one thing.','Do 30 squats, then hold a 1 minute plank.'];
 let pI,bI,pT=0,t0=0,ph='';
 function closePanic(){clearInterval(pI);clearInterval(bI);$('po').classList.remove('on')}
-$('pb').onclick=()=>{if(!S.start)return;clearInterval(pI);clearInterval(bI);pT=60;t0=performance.now();ph='';$('cd').textContent=pT;$('won').disabled=true;
- $('ps').textContent=`You are on a ${Math.floor((Date.now()-S.start)/864e5)} day streak. Do not throw it away.`;$('pt').textContent=rnd(TS);$('pq').textContent=rnd(QS);vib(50);
+$('pb').onclick=()=>{if(!S.start)return;clearInterval(pI);clearInterval(bI);S.ug.push(Date.now());save();pT=60;t0=performance.now();ph='';$('cd').textContent=pT;$('won').disabled=true;
+ $('ps').textContent=`You are on a ${Math.floor((Date.now()-S.start)/864e5)} day streak. Do not throw it away.`;$('pt').textContent=rnd(TS);$('pq').textContent=S.vow?'Remember why: '+S.vow:rnd(QS);vib(50);
  const b=$('br');b.style.animation='none';void b.offsetWidth;b.style.animation='';$('po').classList.add('on');
  bI=setInterval(()=>{const x=((performance.now()-t0)/1e3)%14,p=x<4?'Inhale':x<8?'Hold':'Exhale';$('bt').textContent=p;if(p!==ph){ph=p;vib(30)}},200);
  pI=setInterval(()=>{pT--;$('cd').textContent=Math.max(pT,0);if(pT===30)$('pq').textContent=rnd(QS);if(pT<=0){clearInterval(pI);$('won').disabled=false;vib([60,40,60])}},1000)};
@@ -379,8 +427,8 @@ function loop(){
  K=K.filter(k=>k.l>0&&k.y<innerHeight+20);
  for(const k of K){k.vy+=.28;k.vx*=.99;k.x+=k.vx;k.y+=k.vy;k.r+=k.vr;k.l-=.004;g2.save();g2.translate(k.x,k.y);g2.rotate(k.r);g2.fillStyle=k.c;g2.globalAlpha=Math.min(1,k.l*2);g2.fillRect(-k.w/2,-k.h/2,k.w,k.h);g2.restore()}
  requestAnimationFrame(loop)}
-S.food=S.food||{};S.water=S.water||{};S.exd=S.exd||{};S.pr=S.pr||{};S.ms=S.ms||{};
-const FOODS=[['Egg',6,70],['Chicken breast 150g',46,250],['Paneer 100g',18,265],['Dal 1 bowl',12,200],['Roti',3,100],['Rice 1 cup',4,200],['Curd 1 cup',8,120],['Milk 250ml',8,150],['Whey scoop',24,120],['Soya chunks 50g',26,170],['Peanut butter 2 tbsp',8,190],['Banana',1,105],['Oats 50g',6,190],['Chana 1 cup',15,270],['Fish 150g',30,200],['Almonds 30g',6,175],['Sprouts bowl',14,150],['Tuna can',25,120]];
+S.food=S.food||{};S.water=S.water||{};S.ug=S.ug||[];S.slips=S.slips||[];S.ci=S.ci||{};S.first=S.first||Date.now();S.exd=S.exd||{};S.pr=S.pr||{};S.ms=S.ms||{};
+const FOODS=[['Egg',6,70],['Chicken breast 150g',46,250],['Paneer 100g',18,265],['Dal 1 bowl',12,200],['Roti',3,100],['Rice 1 cup',4,200],['Curd 1 cup',8,120],['Milk 250ml',8,150],['Whey scoop',24,120],['Soya chunks 50g',26,170],['Peanut butter 2 tbsp',8,190],['Banana',1,105],['Oats 50g',6,190],['Chana 1 cup',15,270],['Fish 150g',30,200],['Almonds 30g',6,175],['Sprouts bowl',14,150],['Tuna can',25,120],['Rajma 1 bowl',13,230],['Idli',2,60],['Dosa',3,130],['Poha bowl',5,250]];
 const SYS='You are Forge Coach inside a discipline app. The user wants a silent, focused, mission-driven mindset, a lean muscular body built with home bodyweight workouts, and a calm commanding presence. Be direct, concise and practical. No fluff, no shaming, no markdown. Do not diagnose medical conditions. If the user seems in crisis or mentions self-harm, respond with care and urge them to contact a trusted person or local emergency or crisis services.';
 let R={end:0},tk=0;
 const pgl=()=>S.pg||Math.round((S.w.length?S.w[S.w.length-1].v:70)*2),kcl=()=>S.kc||2600;
@@ -411,16 +459,63 @@ function addWater(){const k=dk();S.water[k]=Math.round(((S.water[k]||0)+.5)*10)/
 async function ai(q,sys,max){if(!S.key)throw new Error('nokey');
  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':S.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-5-5',max_tokens:max||500,system:sys,messages:[{role:'user',content:q}]})});
  const j=await r.json();if(!r.ok)throw new Error(j.error&&j.error.message||'request failed');return j.content.map(c=>c.text||'').join('')}
-async function aiMeal(){const t=$('fai').value.trim();if(!t)return;const b=$('faib');b.disabled=true;b.textContent='Thinking...';
- try{const r=await ai(`Estimate total protein (grams) and calories for this meal: ${t}. Reply with ONLY JSON like {"n":"short name","p":30,"k":450}`,'You are a nutrition estimator. Output only JSON.',120);
-  const j=JSON.parse(r.match(/\{[\s\S]*\}/)[0]);addMeal(String(j.n||t).slice(0,40),+j.p,+j.k);$('fai').value='';toast('Meal added')}
- catch(e){toast(e.message==='nokey'?'Add your API key in the Coach tab':'AI failed: '+String(e.message).slice(0,40))}
- b.disabled=false;b.textContent='Estimate with AI and add'}
+const AL=[[/egg|anda/,0],[/chicken/,1],[/paneer/,2],[/\bdal\b|lentil/,3],[/roti|chapati|chapatti|phulka/,4],[/rice|chawal/,5],[/curd|dahi|yogh?urt/,6],[/milk|doodh/,7],[/whey|shake/,8],[/soya|soy/,9],[/peanut butter/,10],[/banana|kela/,11],[/oat/,12],[/chana|chickpea|chole/,13],[/fish/,14],[/almond|badam/,15],[/sprout/,16],[/tuna/,17],[/rajma/,18],[/idli/,19],[/dosa/,20],[/poha/,21]];
+function parseMeal(t){const items=[],miss=[];t.toLowerCase().split(/,|\band\b|\+|&|\n/).map(x=>x.trim()).filter(Boolean).forEach(part=>{
+ const m=part.match(/(\d+(?:\.\d+)?)/),g=/\d\s*(g|gm|grams?|ml)\b/.test(part),n=m&&!g?Math.min(20,Math.max(.5,+m[1])):1,a=AL.find(x=>x[0].test(part));
+ if(!a){miss.push(part.slice(0,14));return}const f=FOODS[a[1]];items.push({n:(n!==1?n+' x ':'')+f[0],p:f[1]*n,k:f[2]*n})});return{items,miss}}
+async function aiMeal(){const t=$('fai').value.trim();if(!t)return;const r=parseMeal(t);
+ if(r.items.length){r.items.forEach(x=>addMeal(x.n,x.p,x.k));$('fai').value='';toast('Added '+r.items.length+' item'+(r.items.length>1?'s':'')+(r.miss.length?'. Unknown: '+r.miss.join(', '):''));return}
+ if(S.key){try{const q=await ai(`Estimate total protein (grams) and calories for this meal: ${t}. Reply with ONLY JSON like {"n":"short name","p":30,"k":450}`,'You are a nutrition estimator. Output only JSON.',120);const j=JSON.parse(q.match(/\{[\s\S]*\}/)[0]);addMeal(String(j.n||t).slice(0,40),+j.p,+j.k);$('fai').value='';toast('Meal added');return}catch(e){}}
+ toast('Not recognised. Try "3 eggs, 2 roti, dal" or add it manually.')}
 function wk7(){let n=0;for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);if(S.wk[dk(d)])n++}return n}
 function ctx(){const s=stat(),t=ft();return `Name ${S.name||'unknown'}. Rank ${RK[rankOf(S.xp)][1]}, ${S.xp} XP. Clean streak ${S.start?Math.floor((Date.now()-S.start)/864e5):0} days, resets ${S.resets||0}. Discipline streak ${dstreak()} days. Today ${s.pct}% of tasks done. Protein ${t.p}/${pgl()} g, ${t.k}/${kcl()} kcal, water ${S.water[dk()]||0} L. Weights: ${S.w.slice(-8).map(x=>x.v).join(', ')||'none'}. Focus today ${S.foc[dk()]||0} min. Workouts in last 7 days: ${wk7()}. Records: ${JSON.stringify(S.pr)}.`}
-async function coach(k){const q={review:'Give my weekly review: 3 wins, 3 fixes and one clear mission for tomorrow. Max 150 words.',plan:"Adjust tomorrow's home workout and meals using my data. Max 150 words.",push:'Give me a hard, calm, motivating message. Max 80 words.',ask:$('cq').value.trim()}[k];
- if(!q)return;$('cout').textContent='Thinking...';
- try{$('cout').textContent=await ai(`My data: ${ctx()}\n\n${q}`,SYS,500);if(k==='ask')$('cq').value=''}
- catch(e){$('cout').textContent=e.message==='nokey'?'Add your Anthropic API key under Profile below to use the coach.':'AI error: '+e.message}}
-renderToday();renderTrain();renderFuel();renderFocus();renderRank();tick();setInterval(tick,1000);loop();
+const FIXTIP={mind:'Phone down, one deep work block, read 20 pages.',body:'Lay your clothes out tonight and train before noon.',aura:'Cold shower, posture check and a sharp outfit every morning.',control:'Know your danger hours and never be alone with your phone then.'};
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const cleanD=()=>S.start?(Date.now()-S.start)/864e5:0;
+function wst(){const days=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-i);return dk(d)}),pcts=days.map(k=>S.pct[k]||0),pil={};
+ Object.keys(PIL).forEach(p=>{const hs=S.habits.filter(h=>h.p===p);let t=0,n=0;days.forEach(k=>{const a=S.done[k]||[];hs.forEach(h=>{t++;if(a.includes(h.id))n++})});pil[p]=t?Math.round(n/t*100):0});
+ const ks=Object.keys(pil).sort((a,b)=>pil[a]-pil[b]);
+ return{avg:Math.round(pcts.reduce((a,b)=>a+b,0)/7),pil,weak:ks[0],strong:ks[ks.length-1],pa:Math.round(days.reduce((a,k)=>a+(S.food[k]||[]).reduce((x,y)=>x+y.p,0),0)/7),foc:days.reduce((a,k)=>a+(S.foc[k]||0),0),w:wk7()}}
+function bReview(){const w=wst(),pg=pgl(),dd=Math.floor(cleanD()),P=k=>PIL[k][0],win=[],fix=[];
+ if(w.w>=4)win.push(`${w.w} training sessions logged.`);if(dd>=7)win.push(`${dd} days of control. Level ${LV[curI][1]}.`);if(w.pa>=pg*.9)win.push(`Protein averaged ${w.pa}g, on target.`);
+ if(w.foc>=150)win.push(`${w.foc} minutes of deep work.`);if(dstreak()>=3)win.push(`${dstreak()} day discipline streak.`);if(w.avg>=70)win.push(`${w.avg}% average completion. Solid.`);
+ if(!win.length)win.push('You are still here and still tracking. That is the baseline everything is built on.');
+ if(w.w<3)fix.push(`Only ${w.w} session${w.w===1?'':'s'} this week. The minimum is 4. Schedule them now.`);
+ if(w.pa<pg*.75)fix.push(`Protein averaged ${w.pa}g against a ${pg}g goal. Anchor every meal with eggs, paneer, chicken or whey.`);
+ if(w.foc<90)fix.push('Deep work is thin. One 25 minute block before noon, phone in another room.');
+ fix.push(`Weakest pillar: ${P(w.weak)} at ${w.pil[w.weak]}%. ${FIXTIP[w.weak]}`);
+ const u=urgeB();if(u.tot>=3)fix.push(`Your urges peak ${HRS[u.top]}. Have a plan ready for that window.`);
+ const m=S.habits.filter(h=>h.p===w.weak).find(h=>!(S.done[dk()]||[]).includes(h.id));
+ return `Weekly report, ${S.name||'Operator'}.\n\nDiscipline average ${w.avg}%. Strongest: ${P(w.strong)} ${w.pil[w.strong]}%. Weakest: ${P(w.weak)} ${w.pil[w.weak]}%.\n\nWins\n- ${win.join('\n- ')}\n\nFixes\n- ${fix.slice(0,4).join('\n- ')}\n\nMission tomorrow: ${m?m.t:'hold the line and repeat today'}.`}
+function bPlan(){const d=new Date();d.setDate(d.getDate()+1);const p=PLAN[d.getDay()],pg=pgl(),kc=kcl(),pool=FOODS.map((f,i)=>({f,i,r:f[1]/Math.max(1,f[2])})).sort((a,b)=>b.r-a.r),cnt={};let p0=0,k0=0;
+ for(let r=0;r<3&&p0<pg;r++)for(const o of pool){if(p0>=pg||k0>kc-200)break;if((cnt[o.i]||0)>=2||o.f[1]<5)continue;cnt[o.i]=(cnt[o.i]||0)+1;p0+=o.f[1];k0+=o.f[2]}
+ return `Tomorrow: ${p[0]}.\n${p[1].map(e=>`- ${e[0]}: ${e[1]}`).join('\n')}\n\nFuel target: ${pg}g protein, ${kc} kcal. One way to hit protein: ${Object.keys(cnt).map(i=>`${cnt[i]} x ${FOODS[i][0]}`).join(', ')} (about ${p0}g protein, ${k0} kcal). Fill the remaining calories with roti, rice and fruit.\n\nSchedule: up early, 25 minute focus block first, train, cold shower, debrief at night, asleep before 11.`}
+function bPush(){const d=cleanD(),nx=LV[curI+1],left=nx?Math.ceil(nx[0]-d):0,pc=stat().pct;
+ const L=d<1?['A slip is data, not a verdict. You started again. That is the discipline.','Reset the clock, keep the standard. Nothing is lost that you cannot rebuild.']
+ :d<7?['The first week decides who you become. Do not negotiate with the urge, outlast it.','Early days are loud. Stay quiet, stay busy, stay moving.']
+ :d<30?['You already proved you can do hard things. Protect the streak like it is your reputation.','Momentum is built. Do not hand it back for ten minutes of noise.']
+ :['Ghost mode. Calm, silent, unstoppable. Keep the standard when nobody is watching.','You are not trying anymore. You are who you decided to be. Hold it.'];
+ return pick(L)+(nx?`\n\n${left} day${left===1?'':'s'} to ${nx[1]}.`:'')+(pc<50?`\nToday is at ${pc}%. Close the gap before midnight.`:'')}
+const KB=[
+[/urge|fap|relapse|porn|tempt|craving|horny/,()=>`Urge protocol:\n1. Stand up and leave the room now.\n2. 20 push-ups, then cold water on your face.\n3. Wait 10 minutes. Urges peak and pass.\n4. Press PANIC if it is still loud.${S.vow?'\n\nRemember why: '+S.vow:''}${urgeB().tot>=3?'\n\nYour danger window is '+HRS[urgeB().top]+'.':''}`],
+[/review|progress|report|how am i|how.?s my week/,bReview],
+[/plan|schedule|routine|tomorrow/,bPlan],
+[/protein|eat|meal|food|diet|calorie|bulk|cut|fat|lean|weight/,()=>{const t=ft();return `Your protein goal is ${pgl()}g a day. Today: ${t.p}g and ${t.k} kcal so far.\n\nEat about 1.6 to 2.2 g protein per kg bodyweight. To build muscle, eat 250 to 300 kcal over maintenance and aim to gain 0.25 to 0.5 kg a week. To get lean, go 300 to 400 kcal under and keep protein high. Best anchors: eggs, chicken, paneer, curd, dal, whey, soya chunks.`}],
+[/workout|train|exercise|muscle|reacher|body|push.?up|pull.?up|abs|chest|strength|big/,()=>{const p=PLAN[new Date().getDay()];return `Today is ${p[0]}:\n${p[1].map(e=>`- ${e[0]}: ${e[1]}`).join('\n')}\n\nTo grow at home: add reps every week, lower slowly for 3 seconds, load a backpack, cut rest to 45 to 60 seconds. Train 4 to 5 days, sleep 7 to 8 hours, hit protein daily.`}],
+[/sleep|tired|energy|wake|insomnia/,()=>'Sleep is where you grow. Same wake time daily, in bed before 11, no screens 45 minutes before, cool dark room, no caffeine after 2pm. Morning light and a cold shower fix a slow start.'],
+[/aura|shelby|confiden|presence|charisma|respect|talk|speak|dress|posture|shy|alpha/,()=>'Aura rules:\n- Speak slower and lower. Pause before you answer.\n- Hold eye contact. Say less than you know.\n- Shoulders back, chin level, move with purpose.\n- Dress sharp. Fit matters more than price.\n- Keep your word and be on time.\n- Stay calm when others are loud.'],
+[/focus|mind|ghost|disciplin|motivat|lazy|procrastin|distract|phone|discipline|lost|sad|low/,bPush],
+[/who are you|your name|what can you|help|hello|^hi\b|hey/,()=>`I am Ghost, your built-in coach. I run on your phone, so it is free and private. Ask me about urges, workouts, protein, sleep, aura or focus, or tap Weekly review or Tomorrow.`]];
+function bAsk(q){q=q.toLowerCase();for(const [r,f] of KB)if(r.test(q))return f();return 'I can help with urges, workouts, protein and meals, sleep, aura, focus and planning. Try: "how do I stop an urge", "what should I eat", "plan tomorrow" or "weekly review".'}
+function type(o,t){clearInterval(type.t);let i=0;o.textContent='';type.t=setInterval(()=>{i+=5;o.textContent=t.slice(0,i);if(i>=t.length)clearInterval(type.t)},14)}
+async function coach(k){const q=k==='ask'?$('cq').value.trim():'';if(k==='ask'&&!q)return;const o=$('cout');let t=null;
+ if(S.key){o.textContent='Thinking...';try{t=await ai(`My data: ${ctx()}\n\n${{review:'Give my weekly review: 3 wins, 3 fixes and one clear mission for tomorrow. Max 150 words.',plan:"Adjust tomorrow's home workout and meals using my data. Max 150 words.",push:'Give me a hard, calm, motivating message. Max 80 words.',ask:q}[k]}`,SYS,500)}catch(e){t=null}}
+ if(!t)t=k==='review'?bReview():k==='plan'?bPlan():k==='push'?bPush():bAsk(q);
+ if(k==='ask')$('cq').value='';type(o,t)}
+function restoreOld(){const n=id=>$(id).value.trim()===''?null:+$(id).value;
+ const d=n('ro-d'),h=n('ro-h')||0,b=n('ro-b'),u=n('ro-u'),r=n('ro-r'),p=$('ro-p').value.split(/[ ,]+/).map(Number).filter(x=>x>0);
+ if(d!==null){S.start=Date.now()-(d*864e5+h*36e5);S.lvl=lvlOf(d)}
+ if(b!==null)S.best=Math.max(S.best||0,b*864e5);if(u!==null)S.urges=u;if(r!==null)S.resets=r;if(p.length)S.hist=p.map(x=>x*864e5);
+ save();shown=-1;tick();renderRank();toast('Old records restored')}
+initTicks();renderToday();renderTrain();renderFuel();renderFocus();renderRank();renderStreak();tick();setTimeout(()=>{if(S.start&&Date.now()-(S.lastB||S.first)>12096e5)toast('Tip: share a backup from the Coach tab')},4000);setInterval(tick,1000);loop();
 </script></body></html>
