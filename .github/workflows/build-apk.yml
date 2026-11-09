@@ -15,15 +15,20 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: Use fixed signing key
-        run: mkdir -p ~/.android && cp debug.keystore ~/.android/debug.keystore
+        run: |
+          test -f debug.keystore || { echo 'debug.keystore is missing from the repo. Upload it so updates keep your data.'; exit 1; }
+          mkdir -p ~/.android && cp debug.keystore ~/.android/debug.keystore
       - name: Create Android project
         run: |
           mkdir www && cp index.html www/
           npm init -y
           npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
           npx cap init Forge com.forge.discipline --web-dir www
+          node -e "const f='capacitor.config.json',c=require('./'+f);c.backgroundColor='#08090b';require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
           npx cap add android
-          sed -i 's|<item name="windowActionBar">false</item>|&<item name="android:statusBarColor">#08090b</item><item name="android:navigationBarColor">#08090b</item>|' android/app/src/main/res/values/styles.xml
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+          sed -i 's|@drawable/splash|@color/forge_bg|g' android/app/src/main/res/values/styles.xml
+          sed -i 's|<item name="windowActionBar">false</item>|&<item name="android:statusBarColor">#08090b</item><item name="android:navigationBarColor">#08090b</item><item name="android:windowBackground">@color/forge_bg</item>|' android/app/src/main/res/values/styles.xml
       - name: Add widgets, icon and native bridge
         run: |
           A=android/app/src/main
@@ -49,6 +54,26 @@ jobs:
                 public void push(String json) {
                   ctx.getSharedPreferences("forge", 0).edit().putString("data", json).apply();
                   ForgeWidget.refresh(ctx);
+                }
+                @JavascriptInterface
+                public void saveFull(String json) {
+                  ctx.getSharedPreferences("forge", 0).edit().putString("full", json).apply();
+                }
+                @JavascriptInterface
+                public String loadFull() {
+                  return ctx.getSharedPreferences("forge", 0).getString("full", "");
+                }
+                @JavascriptInterface
+                public void share(final String text) {
+                  me.runOnUiThread(new Runnable() {
+                    public void run() {
+                      Intent s = new Intent(Intent.ACTION_SEND);
+                      s.setType("text/plain");
+                      s.putExtra(Intent.EXTRA_SUBJECT, "Forge backup");
+                      s.putExtra(Intent.EXTRA_TEXT, text);
+                      me.startActivity(Intent.createChooser(s, "Save backup to"));
+                    }
+                  });
                 }
                 @JavascriptInterface
                 public String pending() {
