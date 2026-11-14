@@ -21,6 +21,7 @@ jobs:
       - name: Create Android project
         run: |
           mkdir www && cp index.html www/
+          sed -i "s|__UPDATE_URL__|https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/index.html|" www/index.html
           npm init -y
           npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
           npx cap init Forge com.forge.discipline --web-dir www
@@ -39,14 +40,17 @@ jobs:
 
           import android.content.Context;
           import android.content.Intent;
+          import android.os.Build;
           import android.os.Bundle;
           import android.webkit.JavascriptInterface;
+          import androidx.core.app.ActivityCompat;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
             @Override
             public void onCreate(Bundle b) {
               super.onCreate(b);
+              lockMode(getIntent());
               final Context ctx = getApplicationContext();
               final MainActivity me = this;
               getBridge().getWebView().addJavascriptInterface(new Object() {
@@ -71,7 +75,7 @@ jobs:
                       s.setType("text/plain");
                       s.putExtra(Intent.EXTRA_SUBJECT, "Forge backup");
                       s.putExtra(Intent.EXTRA_TEXT, text);
-                      me.startActivity(Intent.createChooser(s, "Save backup to"));
+                      me.startActivity(Intent.createChooser(s, "Save to"));
                     }
                   });
                 }
@@ -82,12 +86,70 @@ jobs:
                   if (in != null) in.removeExtra("go");
                   return g == null ? "" : g;
                 }
+                @JavascriptInterface
+                public void setAlarms(String json) {
+                  ForgeAlarm.save(ctx, json);
+                }
+                @JavascriptInterface
+                public void askNotif() {
+                  if (Build.VERSION.SDK_INT >= 33) {
+                    me.runOnUiThread(new Runnable() {
+                      public void run() {
+                        ActivityCompat.requestPermissions(me, new String[]{"android.permission.POST_NOTIFICATIONS"}, 7712);
+                      }
+                    });
+                  }
+                }
+                @JavascriptInterface
+                public void stopAlarm() {
+                  ForgeAlarm.stop(ctx);
+                  me.runOnUiThread(new Runnable() {
+                    public void run() {
+                      if (Build.VERSION.SDK_INT >= 27) {
+                        me.setShowWhenLocked(false);
+                        me.setTurnScreenOn(false);
+                      }
+                    }
+                  });
+                }
+                @JavascriptInterface
+                public void syncSteps() {
+                  me.runOnUiThread(new Runnable() {
+                    public void run() {
+                      ForgeHealth.sync(me, me.getBridge().getWebView());
+                    }
+                  });
+                }
+                @JavascriptInterface
+                public void connectHealth() {
+                  me.runOnUiThread(new Runnable() {
+                    public void run() {
+                      ForgeHealth.request(me);
+                    }
+                  });
+                }
               }, "ForgeNative");
             }
+
+            void lockMode(Intent i) {
+              boolean al = i != null && "alarm".equals(i.getStringExtra("go"));
+              if (Build.VERSION.SDK_INT >= 27) {
+                setShowWhenLocked(al);
+                setTurnScreenOn(al);
+              }
+            }
+
             @Override
             public void onNewIntent(Intent i) {
               super.onNewIntent(i);
               setIntent(i);
+              lockMode(i);
+            }
+
+            @Override
+            public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
+              super.onRequestPermissionsResult(code, perms, res);
+              if (code == 7711) ForgeHealth.sync(this, getBridge().getWebView());
             }
           }
           EOT
@@ -156,6 +218,297 @@ jobs:
           public class ForgeSmall extends AppWidgetProvider {
             @Override
             public void onUpdate(Context c, AppWidgetManager m, int[] ids) { ForgeWidget.refresh(c); }
+          }
+          EOT
+          cat > $J/ForgeAlarm.java <<'EOT'
+          package com.forge.discipline;
+
+          import android.app.AlarmManager;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.media.AudioAttributes;
+          import android.media.RingtoneManager;
+          import android.net.Uri;
+          import android.os.Build;
+          import androidx.core.app.NotificationCompat;
+          import java.util.Calendar;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          public class ForgeAlarm {
+            static void save(Context c, String json) {
+              c.getSharedPreferences("forge", 0).edit().putString("alarms", json).apply();
+              resched(c);
+            }
+
+            static JSONArray list(Context c) {
+              try {
+                return new JSONArray(c.getSharedPreferences("forge", 0).getString("alarms", "[]"));
+              } catch (Exception e) {
+                return new JSONArray();
+              }
+            }
+
+            static PendingIntent bc(Context c, int id) {
+              Intent i = new Intent(c, ForgeReceiver.class);
+              i.setAction("forge.alarm." + id);
+              i.putExtra("id", id);
+              return PendingIntent.getBroadcast(c, id, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            }
+
+            static void resched(Context c) {
+              AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+              SharedPreferences p = c.getSharedPreferences("forge", 0);
+              String prev = p.getString("sched", "");
+              if (prev.length() > 0) {
+                for (String s : prev.split(",")) {
+                  try {
+                    am.cancel(bc(c, Integer.parseInt(s.trim())));
+                  } catch (Exception e) {
+                  }
+                }
+              }
+              StringBuilder ids = new StringBuilder();
+              JSONArray a = list(c);
+              for (int k = 0; k < a.length(); k++) {
+                JSONObject o = a.optJSONObject(k);
+                if (o == null || !o.optBoolean("on", true)) continue;
+                long t = next(o.optInt("h"), o.optInt("m"), o.optInt("d"));
+                if (t < 0) continue;
+                int id = o.optInt("id");
+                try {
+                  set(c, am, o, id, t);
+                  if (ids.length() > 0) ids.append(",");
+                  ids.append(id);
+                } catch (Exception e) {
+                }
+              }
+              p.edit().putString("sched", ids.toString()).apply();
+            }
+
+            static void set(Context c, AlarmManager am, JSONObject o, int id, long t) {
+              PendingIntent pi = bc(c, id);
+              if (o.optBoolean("a")) {
+                Intent open = new Intent(c, MainActivity.class);
+                open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                open.putExtra("go", "alarm");
+                PendingIntent show = PendingIntent.getActivity(c, id, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                am.setAlarmClock(new AlarmManager.AlarmClockInfo(t, show), pi);
+              } else if (Build.VERSION.SDK_INT >= 23) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, t, pi);
+              } else {
+                am.set(AlarmManager.RTC_WAKEUP, t, pi);
+              }
+            }
+
+            static long next(int h, int m, int mask) {
+              long now = System.currentTimeMillis() + 5000;
+              for (int i = 0; i < 8; i++) {
+                Calendar t = Calendar.getInstance();
+                t.add(Calendar.DAY_OF_YEAR, i);
+                t.set(Calendar.HOUR_OF_DAY, h);
+                t.set(Calendar.MINUTE, m);
+                t.set(Calendar.SECOND, 0);
+                t.set(Calendar.MILLISECOND, 0);
+                boolean day = mask == 0 || ((mask >> (t.get(Calendar.DAY_OF_WEEK) - 1)) & 1) == 1;
+                if (t.getTimeInMillis() > now && day) return t.getTimeInMillis();
+              }
+              return -1;
+            }
+
+            static void fire(Context c, int id) {
+              JSONArray a = list(c);
+              for (int k = 0; k < a.length(); k++) {
+                JSONObject o = a.optJSONObject(k);
+                if (o != null && o.optInt("id") == id) {
+                  show(c, id, o.optString("t", "Forge"), o.optBoolean("a"));
+                  break;
+                }
+              }
+              resched(c);
+            }
+
+            static void show(Context c, int id, String text, boolean alarm) {
+              NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+              String ch = alarm ? "forge_alarm" : "forge_remind";
+              if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ch) == null) {
+                NotificationChannel n = new NotificationChannel(ch, alarm ? "Alarms" : "Reminders",
+                    alarm ? NotificationManager.IMPORTANCE_HIGH : NotificationManager.IMPORTANCE_DEFAULT);
+                if (alarm) {
+                  Uri u = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+                  n.setSound(u, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                      .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+                  n.enableVibration(true);
+                  n.setVibrationPattern(new long[]{0, 700, 400, 700});
+                }
+                nm.createNotificationChannel(n);
+              }
+              Intent open = new Intent(c, MainActivity.class);
+              open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+              open.putExtra("go", alarm ? "alarm" : "");
+              PendingIntent pi = PendingIntent.getActivity(c, id + 100000, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+              NotificationCompat.Builder b = new NotificationCompat.Builder(c, ch)
+                  .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                  .setContentTitle(alarm ? "Forge alarm" : "Forge")
+                  .setContentText(text)
+                  .setPriority(alarm ? NotificationCompat.PRIORITY_MAX : NotificationCompat.PRIORITY_DEFAULT)
+                  .setCategory(alarm ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
+                  .setAutoCancel(true)
+                  .setContentIntent(pi);
+              if (alarm) b.setFullScreenIntent(pi, true);
+              Notification n = b.build();
+              if (alarm) n.flags |= Notification.FLAG_INSISTENT;
+              nm.notify(id, n);
+            }
+
+            static void stop(Context c) {
+              ((NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE)).cancelAll();
+            }
+          }
+          EOT
+          cat > $J/ForgeReceiver.java <<'EOT'
+          package com.forge.discipline;
+
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+
+          public class ForgeReceiver extends BroadcastReceiver {
+            @Override
+            public void onReceive(Context c, Intent i) {
+              String a = i == null ? null : i.getAction();
+              if (a == null) return;
+              if (a.startsWith("forge.alarm.")) ForgeAlarm.fire(c, i.getIntExtra("id", 0));
+              else ForgeAlarm.resched(c);
+            }
+          }
+          EOT
+          cat > $J/ForgeHealth.java <<'EOT'
+          package com.forge.discipline;
+
+          import android.app.Activity;
+          import android.content.pm.PackageManager;
+          import android.os.Build;
+          import android.os.OutcomeReceiver;
+          import android.webkit.WebView;
+          import androidx.core.app.ActivityCompat;
+          import java.lang.reflect.Method;
+          import java.time.Instant;
+          import java.util.Calendar;
+          import java.util.Locale;
+          import java.util.concurrent.Executor;
+          import java.util.concurrent.atomic.AtomicInteger;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          public class ForgeHealth {
+            static final String PERM = "android.permission.health.READ_STEPS";
+
+            static void js(final Activity a, final WebView w, String json, String status) {
+              final String code = "window.onSteps&&window.onSteps(" + JSONObject.quote(json) + "," + JSONObject.quote(status) + ")";
+              a.runOnUiThread(new Runnable() {
+                public void run() {
+                  w.evaluateJavascript(code, null);
+                }
+              });
+            }
+
+            static void request(Activity a) {
+              if (Build.VERSION.SDK_INT >= 34) {
+                ActivityCompat.requestPermissions(a, new String[]{PERM}, 7711);
+              }
+            }
+
+            static void finish(Activity a, WebView w, long[] steps, String[] days, String[] err, AtomicInteger left) {
+              if (left.decrementAndGet() > 0) return;
+              try {
+                JSONArray arr = new JSONArray();
+                for (int i = 0; i < steps.length; i++) {
+                  JSONObject o = new JSONObject();
+                  o.put("d", days[i]);
+                  o.put("s", steps[i]);
+                  arr.put(o);
+                }
+                js(a, w, arr.toString(), err[0].length() == 0 ? "ok" : "error " + err[0]);
+              } catch (Exception e) {
+                js(a, w, "[]", "error " + e);
+              }
+            }
+
+            static void sync(final Activity a, final WebView w) {
+              try {
+                if (Build.VERSION.SDK_INT < 34) {
+                  js(a, w, "[]", "unavail");
+                  return;
+                }
+                if (a.checkSelfPermission(PERM) != PackageManager.PERMISSION_GRANTED) {
+                  js(a, w, "[]", "noperm");
+                  return;
+                }
+                final Object mgr = a.getSystemService("healthconnect");
+                if (mgr == null) {
+                  js(a, w, "[]", "unavail");
+                  return;
+                }
+                final Class<?> reqC = Class.forName("android.health.connect.AggregateRecordsRequest");
+                final Class<?> mgrC = Class.forName("android.health.connect.HealthConnectManager");
+                final Class<?> aggT = Class.forName("android.health.connect.datatypes.AggregationType");
+                final Class<?> rangeC = Class.forName("android.health.connect.TimeRangeFilter");
+                final Class<?> instB = Class.forName("android.health.connect.TimeInstantRangeFilter$Builder");
+                final Class<?> reqB = Class.forName("android.health.connect.AggregateRecordsRequest$Builder");
+                final Object type = Class.forName("android.health.connect.datatypes.StepsRecord").getField("STEPS_COUNT_TOTAL").get(null);
+                final Method agg = mgrC.getMethod("aggregate", reqC, Executor.class, OutcomeReceiver.class);
+                final int n = 7;
+                final long[] steps = new long[n];
+                final String[] days = new String[n];
+                final String[] err = new String[]{""};
+                final AtomicInteger left = new AtomicInteger(n);
+                final Executor ex = a.getMainExecutor();
+                for (int i = 0; i < n; i++) {
+                  final int idx = i;
+                  Calendar c = Calendar.getInstance();
+                  c.add(Calendar.DAY_OF_YEAR, -i);
+                  c.set(Calendar.HOUR_OF_DAY, 0);
+                  c.set(Calendar.MINUTE, 0);
+                  c.set(Calendar.SECOND, 0);
+                  c.set(Calendar.MILLISECOND, 0);
+                  days[i] = String.format(Locale.US, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+                  long s = c.getTimeInMillis();
+                  c.add(Calendar.DAY_OF_YEAR, 1);
+                  long e = Math.min(c.getTimeInMillis(), System.currentTimeMillis());
+                  Object tb = instB.getConstructor().newInstance();
+                  instB.getMethod("setStartTime", Instant.class).invoke(tb, Instant.ofEpochMilli(s));
+                  instB.getMethod("setEndTime", Instant.class).invoke(tb, Instant.ofEpochMilli(e));
+                  Object filter = instB.getMethod("build").invoke(tb);
+                  Object rb = reqB.getConstructor(rangeC).newInstance(filter);
+                  reqB.getMethod("addAggregationType", aggT).invoke(rb, type);
+                  Object req = reqB.getMethod("build").invoke(rb);
+                  agg.invoke(mgr, req, ex, new OutcomeReceiver<Object, Throwable>() {
+                    public void onResult(Object r) {
+                      try {
+                        Object o = r.getClass().getMethod("get", aggT).invoke(r, type);
+                        if (o != null) steps[idx] = ((Number) o).longValue();
+                      } catch (Throwable t) {
+                        err[0] = String.valueOf(t);
+                      }
+                      finish(a, w, steps, days, err, left);
+                    }
+
+                    public void onError(Throwable t) {
+                      err[0] = String.valueOf(t);
+                      finish(a, w, steps, days, err, left);
+                    }
+                  });
+                }
+              } catch (Throwable t) {
+                js(a, w, "[]", "error " + t);
+              }
+            }
           }
           EOT
           cat > $A/res/layout/widget_forge.xml <<'EOT'
@@ -241,9 +594,15 @@ jobs:
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p).read()
-          r='<receiver android:name=".ForgeWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/forge_widget_info"/></receiver><receiver android:name=".ForgeSmall" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/forge_small_info"/></receiver>'
-          assert '</application>' in s
-          open(p,'w').write(s.replace('</application>', r+'</application>'))
+          perms='<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/><uses-permission android:name="android.permission.VIBRATE"/><uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/><uses-permission android:name="android.permission.health.READ_STEPS"/>'
+          rec='<receiver android:name=".ForgeWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/forge_widget_info"/></receiver>'
+          rec+='<receiver android:name=".ForgeSmall" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/forge_small_info"/></receiver>'
+          rec+='<receiver android:name=".ForgeReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.QUICKBOOT_POWERON"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter></receiver>'
+          rec+='<activity-alias android:name=".ViewPermissionUsageActivity" android:exported="true" android:targetActivity=".MainActivity" android:permission="android.permission.START_VIEW_PERMISSION_USAGE"><intent-filter><action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/><category android:name="android.intent.category.HEALTH_PERMISSIONS"/></intent-filter></activity-alias>'
+          rec+='<activity-alias android:name=".PermissionsRationaleActivity" android:exported="true" android:targetActivity=".MainActivity"><intent-filter><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/></intent-filter></activity-alias>'
+          assert '</application>' in s and '<application' in s
+          s=s.replace('<application',perms+'<application',1).replace('</application>',rec+'</application>')
+          open(p,'w').write(s)
           PY
       - name: Build APK
         run: |
@@ -253,3 +612,71 @@ jobs:
         with:
           name: Forge-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build PC app
+        run: |
+          mkdir desktop && cp index.html desktop/
+          sed -i "s|__UPDATE_URL__|https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/index.html|" desktop/index.html
+          cd desktop
+          cat > main.js <<'EOT'
+          const {app,BrowserWindow,Menu,Tray,protocol,nativeImage,ipcMain}=require('electron');
+          const path=require('path'),fs=require('fs');
+          app.setAppUserModelId('com.forge.discipline');
+          protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
+          let win=null,tray=null,quitting=false;
+          const show=()=>{if(win){win.show();win.focus()}};
+          if(!app.requestSingleInstanceLock()){app.quit()}else{
+            app.on('second-instance',show);
+            ipcMain.on('show',show);
+            app.on('before-quit',()=>{quitting=true});
+            app.whenReady().then(()=>{
+              protocol.handle('app',()=>new Response(fs.readFileSync(path.join(__dirname,'index.html')),{headers:{'content-type':'text/html; charset=utf-8'}}));
+              Menu.setApplicationMenu(null);
+              const icon=nativeImage.createFromPath(path.join(__dirname,'icon.png'));
+              const hidden=process.argv.includes('--hidden');
+              win=new BrowserWindow({width:1100,height:820,minWidth:420,minHeight:600,show:false,backgroundColor:'#0b0c10',title:'Forge',icon:icon,autoHideMenuBar:true,
+                webPreferences:{preload:path.join(__dirname,'preload.js'),autoplayPolicy:'no-user-gesture-required'}});
+              win.once('ready-to-show',()=>{if(!hidden)win.show()});
+              win.loadURL('app://forge/');
+              win.on('close',e=>{if(!quitting){e.preventDefault();win.hide()}});
+              tray=new Tray(icon.resize({width:16,height:16}));
+              tray.setToolTip('Forge');
+              const build=()=>Menu.buildFromTemplate([
+                {label:'Open Forge',click:show},
+                {label:'Start with Windows',type:'checkbox',checked:app.getLoginItemSettings().openAtLogin,click:i=>app.setLoginItemSettings({openAtLogin:i.checked,args:['--hidden']})},
+                {type:'separator'},
+                {label:'Quit',click:()=>{quitting=true;app.quit()}}]);
+              tray.setContextMenu(build());
+              tray.on('click',show);
+              const flag=path.join(app.getPath('userData'),'autostart.flag');
+              if(!fs.existsSync(flag)){try{fs.writeFileSync(flag,'1');app.setLoginItemSettings({openAtLogin:true,args:['--hidden']})}catch(e){}}
+            });
+          }
+          EOT
+          cat > preload.js <<'EOT'
+          const {contextBridge,ipcRenderer}=require('electron');
+          contextBridge.exposeInMainWorld('ForgeDesk',{show:()=>ipcRenderer.send('show')});
+          EOT
+          cat > package.json <<'EOT'
+          {"name":"forge","version":"1.0.0","description":"Forge life system","author":"Forge","main":"main.js",
+          "devDependencies":{"electron":"^31.0.0","electron-builder":"^24.13.3"},
+          "build":{"appId":"com.forge.discipline","productName":"Forge","files":["main.js","preload.js","index.html","icon.png"],
+          "win":{"target":"nsis","icon":"icon.png"},"nsis":{"oneClick":true,"perMachine":false,"allowToChangeInstallationDirectory":false}}}
+          EOT
+          echo "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAARPklEQVR42u3dPXIT69aG4e4uZxCQONYMXAyGkOERMhiKGSgmIYAYku0q1y4bSXb/rHc91xV9df4+ED567l7S2XueKOXd+w9/vApAR79//Zy9CnX4wzDwAAJBAGDsAUSBAMDgAwgCAYDBBxAEAsDoAyAGBIDRB0AMCADDD4AQEABGHwAxIAAMPwBCQAAYfgCEgAAw/AAIAQFg+AEQAgLA8AMgBASA4QdACAgAww+AELhoMf4AkLcpsz8kAMi7BrT4jRh+AITAbYb/CMD4A2B7wgLA+ANgg15n9qIDwNuM+JHAcBcA4w+AbQoLAOMPgI1ax+xFBYB1jfCRQPkLgPEHwDUgLACMPwAiICwAjD8AIiAsAIw/ACIgLACMPwAiYHuzFwcA9lPlfyFQ4gJg/AFwDQgLAOMPgAgICwDjD4AICAsA4w+ACDhuCxcvPwDkOSQAPP0DwLGbuKT8RgFABBwUAMYfAGps5NL1NwYAIuDgADD+AFBrM5cuvxEAEAHFLgAAQC2bBoCnfwCouaHLqL9wABABxQLA+ANA7U31HQAACLR6AHj6B4D627pU/wUCAOtv7FL1FwYAbLe1vgMAAIFWCQBP/wAw1hXABQAAXAA8/QNAwhVgOfoXAADsv8E+AgCAQK8OAE//ADDuFcAFAABcADz9A0DCFcAFAABcADz9A0DCFcAFAABcADz9A0DCFcAFAABcADz9A0DCFcAFAMJ8+/r5pn8c6Gn29A+Zw//x05er/jlgPL9//by473deJsh84r/m3yMEoK+LHwF4+oee4//4z13zrwHGcs12uwCAp37XAAh08TMCFwDIHP6XCAEYw6XvAczGHwy/EIC8CBAAYPiFAAQGwGL8wfh3+HUAt235LADA8LsGQN4VQACA4RcCIACMPxh+IQAJEeDvBQDG368fArkAQPZwnqZpOrsGQN4FYDb+EPvEfHryf5/3+n8qBKBGBAgAyB7+/xMCIACAoOEXAhAWAL4ECP3H/3Tj+L/23zNCBAHPXQA8/UO74V+LLwpCsyuAAIB+w7/2+O8aAUIABAAY/hrDLwRAAADBwy8EoGMAGH8YcvxPBX67vh8AA0aAAABP/a4BIAAAwy8EQAAAhl8IgAAADL8QgEYBYPyh5PifGr1svigIxSJAAICnftcAEACA4RcCIADA8Bt+IQAtA8DfDRCOHf/d/q57Bfk7DsKBXADguOHngIuAawD4CACOekI0/gdHgBBAAAgADL/hFwJebTIDwPhj+A2/EBAC5BEAGH/DLwREAAIADL/hFwJCAAEAht/4h0aAEEAAgOE3/ELAq40AAMNv+IUACABIHX/DHxoCIgABAJ76cQ0AAQCGHyEAAgAMP0IABAAYfoQACACoPf6GXwiIAAQAeOpHBAgBBAAYfoSAEEAAgOFHCAgBBACMM/6Gn0NCQAQgAMDwIwRAAGD4jT9pESAEEAAYfsOPEPBqIwAw/IYfIQACAONv+IkKARGAAMDwG36EAAgADL/xJy0ChAACAMNv+BECXm0EAIbfK44QAAFAzvgbfoSACEAA4KkfXANAAGD4QQiAAMDwgxAAAYDhByEAAoCC42/4EQIiAAGAp34QAUIAAYDhByEgBBAAGH4QAkIAAcA442/4oUAIiAAEgOE3/CAEEAAYfuMPaREgBAQAht/wgxDwagsADL/hByGAAMD4G36ICgERIAAw/IYfhAACAMNv/CEtAoSAAMDwG34QAl5tAYDhB4QAAoDO42/4QQiIAAGAp35ABAgBAYDhB4SAEBAAGH5ACCAAMPyAEEAAUHD8DT8IAREgAPDUD4gAISAAMPyAEBACAgDDDwgBISAAGGf8DT9QLgREgAAw/IYfEAIIAMNv/IG0CBACAsDwG35ACHi1BYDhN/yAEEAAGH/DD0SFgAgQAIbf8ANCAAEQPfzGH4iMACEgADz1A7gGIAAixt/wA0JABAiAoPE3/IAQEAGrW7wEpRl/wPsYLgBBT//+CwO4BrgCbOrOS6CUAXZ+jzt7KQQAhh8QAggAww8gBNiDLwEafwDvhwIAP+wA3hcFAAAgAAAAAQAACAAAQAAAAAIAABAAAIAAAAAEAAAgAAAAAQAACAAAQAAAAAIAABAAAIAAAAABAAAIAABAAAAAAgAAEAAAgAAAAAQAACAAAAABAAAIAABAAAAAAgAAEAAAgAAAAAQAACAAAAABAAACAAAQAACAAAAABAAAIAAAAAEAAAgAAEAAAAACAAAQAACAAAAABAAAIAAAAAEAAAgAAEAAAAACAAAEAAAgAAAAAQAACAAAQAAAAAIAABAAAIAAAAAEAAAgAAAAAQAACAAAQAAAAAIAABAAAIAAAAAEAAAIAABAAAAAAgAAEAAAgAAAAAQAHOz+9HD2KuDnCwQAgW/O96eHszdq1v7Zevrz5RVBAICnNfwcgQCAam/SrgGs8dQvCujozktAUiD8OH8/eTXwxA8uAIS9YbsIsNbPhp8jBAB4ysPPAwgAGOWN2zWAt/4M+PlhZL4DgBHw/QDhCC4AkPsm7iLgiV9MIABAWODPFQQApL2ZuwZ46hcXdOc7AHDFG7vvB4hEcAGAwDd2FwFP/IIDAQDiA38+IAAg7Q3eNcBTvwChA98BYCiPn8VXerP3/QCD6+cAFwAIfLN1EfCaG38EAOz8plstBPyp5D31G39G5SMA2lwDfCxg+D3xgwBACAgBw2/44R98BEDbEKgyXj4a6PHaGX8EAAwSAb4f4Km/488SrMVHAERcA3wsYPg98YMAQAgIAcNv+InnIwAiQ8DoGX/jjwsAuAa4Bhh+w48AACEgBAw/CAAQAkLA8ENDvgMABUeh2/cDjD+4AIBrQNA1wPCDAAAhEBQChh8EAAiBoBAw/DAO3wGAwcak6vcDjD+4AIBrQNA1wPCDAAAhEBQChh8EAAiBoBAw/NCD7wBAoxHaepyNP7gAAEHXAMMPAgAICgHDD335CACaj9X96eF865C/5t9j/EEAAP+N1ojfD6g2/MYftuEjANjp6bX6xwKe+EEAAEEhYPghk48AIHjkjD+4AACh1wDDDwIAEAKGHwQAIAQMP3TlOwBgHP3+wAUAcA0w/CAAACFg+EEAAELA8EMPvgMARtX4gwsA4Bpg+EEAAELA8IMAAISA4YcefAcAGoWA8QdcAMA1wPADAgCEgOEHBAAIAcMP0XwHAEJCwPgDAgACI+Bx0F8a9qf/vPGH/nwEAIHXgEsRALgAAAACAAAQAACAAAAABAAAIABgexX/Nrn4+QIBADu8Od+fHs7eqFn7Z+vpz5dXBAEAntbwcwQCAKq9SbsGsMZTvyigI38lQKICwV/pDk/84AJA4Bu2iwBr/Wz4OUIAgKc8/DyAAIBR3rhdA3jrz4CfH0bmOwAYAd8PEI7gAgC5b+IuAp74xQQCAIQF/lxBAEDam7lrgKd+cUF3vgMAV7yx+36ASAQXAAh8Y3cR8MQvOBAAID7w5wMCANLe4F0DPPULEDrwHQCG8vhZfKU3e98PMLh+DnABgMA3WxcBr7nxRwDAzm+61ULAn0reU7/xZ1Q+AqDNNcDHAobfEz8IAISAEDD8hh/+wUcAtA2BKuPlo4Eer53xRwDAIBHg+wGe+jv+LMFafARAxDXAxwKG3xM/CACEgBAw/IafeD4CIDIEjJ7xN/64AIBrgGuA4Tf8CAAQAkLA8IMAACEgBAw/NOQ7AFBwFLp9P8D4gwsAuAYEXQMMPwgAEAJBIWD4QQDwvPM0Td6UhEC7EDD8vPF9kR35DoAfdgYbk6rfDzD+eD90AeD2H3pvVq4Bw14DDD+GXwAgBIRAUAgYfgy/AEAICIGgEDD8GP4e5nfvP/zxMrzet6+ft/yP9+Y2iJRRNP5UG/6Pn754dV0A2v6Xxpuca8Dh1wDDj6d+FwD2vwK4BrgIHDaYhp/Kw+/pXwAkRYAQEAG7DOjIv3YynviNvwBIjQAhIAQ2G1JP/VQefuMvAISACBACKw+r4cdTvwBACBAUAoYfwy8AGDsChIAIGJrxN/zGXwAIASEgBAw/ht+rLQCEgBAQAoYfw48AEAIiQAgYftqNv+EXAEJACIiAxhFg/A2/4RcAHBMBQkAIGH5KDL/xFwAIARqHgOE3/IZfACAECAoBw2/4Db8AYIwQ8GYtAoy/8Tf8AgDXAISA4Tf8xl8AIAQQAobf8Bt+AYAQQAgYfsNv+AUAQoDACDD+ht/wCwByQsAbvhAw/Mbf8AsAXANICgHDb/iNvwBACAiBoBAw/Ibf8AsAhIAQCIsA42/4Db8AQAiIgEYh8OP8/fRcEDz+44bf+Bt+AYAQEAJg+BEAiAAhAAnDb/wFAEJACIDhRwAgBIQAGH4EAEJABMDw42/4BQBCQAiA4UcAIAKEAHQcfuOPAEAIgOFHAIAQAMOPAIBjQkAEYPwNPwIA1wAw/MYfAYAQAMNv+BEACAEw/IYfAYAQAMMPAoDGISACMP6GHwGAawB46gcBgBAAww8CACEAhh8EAP1DQATQavwNPwIAISAEMPwgABABQoCOw2/8EQAIASGA4QcBgBAQAhh+EAAIARHA8ONv+BEAIAQw/CAAwMcCdBx+448AACGA4QcBAEIAww8CACqEgAgw/oYfAQCuARh+448AACGA4Tf8CAAQAhh+EAAgBDD8IACgcQiIgNDxN/wIABABQsBTPwgAEAIYfhAAIAQw/CAAICoERMDg42/4EQAgBISA4YeeATBN0yQCEAFCIHn4jT9pfv/6OQsAhIAQMPwgAEAICAHDDwIAhIAIaDb+hh8EAAgBww+xAbB4GeDQsThPO569Cw6/8YeDuABAnWtAykXA5/xQ4AIgAEAIGH5IDQARACVDoFMEOPVDofGfpmnyHQCoOzIdvh/gc34oygUAxrgGjHYRcO6H4hcAAQBCwPCDAACEgOGHqAAQATBkCFSIAJ/xw2DjP02+BAijj9WRXxT0BT8YmAsA9LkG7HURcO6HBhcAAQBCwPBDegCIAGgVAmtGgFM/NBp/AQBCwPBDaAD4EiAcpPgXBX3BD5pzAYCsa8Cli4DP+SHkAjA/9y8SARAXAoYfgsZfAIAQOE1O/SAABABEXwQMPwQFwHLtvxAwnsYfeoz/ixcAVwBwDTD8IAAAIWD4ISUARAAIAcMPPcd/mvyFgGBYVUbX+MOYLn7ZzxUAXAMMP/R6+hcAIAQMPwgAAQBCwPCDABABIAQMP7Qc/2nyJUBo7a3jbfyhr6v/in+uAJBzDTD80PvpXwCAEDD8EBoAy9r/gUBtL4288Yec8b/pAuAKAAB9AmDZ6j8YAKg5/jcHAADQw80B4AoAAGM//bsAAIALgCsAACQ8/bsAAIALgCsAACQ8/bsAAIALgCsAACQ8/a9yARABADDW+K8SAADAeFYJAFcAABjn6d8FAABcAFwBACDh6X/1C4AIAID64796AIgAAKg//psEAABQ3yYB4AoAALU3dRntFwwAxr9wAIgAAKi7ob4DAACBNg8AVwAAqLedS5ffCAAY/2IBIAIAoNZWLl1/YwBg/IsEgAgAgBrbuKT8RgHA+B8cAADAsQ4LAFcAADz9H7eFS+pvHACSN3BJfwEAIHH7Fi8EAORtXrnhfff+wx8/HgAY/oALgGsAAMY/PABEAADGPzQARAAAxj80AEQAAMY/NABEAADGfxtDjav/hQAAhj/kAuAaAICNCg8AEQCAbVrH0GPqIwEADH/IBcA1AAAbFB4AIgAA2/M6rcbTRwIAGP7AABACABj+6yz+oAAgb1PaD6VrAACGPzAAhAAAhj84AIQAAIY/OACEAADJwx8fAEIAwPAn//59W14IABh+AYAQADD8AkAMiAEAoy8AhAAAhl8AiAEAjL4AEAMAGH0BIAgAMPgCQBAAYPAFgCgAwNgLAAQCYODZ018up1PNheMZtQAAAABJRU5ErkJggg==" | base64 -d > icon.png
+          npm version 1.0.${{ github.run_number }} --no-git-tag-version
+          npm install
+          npx electron-builder --win nsis --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Forge-PC
+          path: desktop/dist/*.exe
